@@ -82,7 +82,9 @@ jobs:
         run: |
           gofmt -w pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go pkg/console/layersentry.go pkg/console/layersentry_test.go pkg/version/product.go
           git diff --check
-          go test ./...
+          # Harvester moved rancherd-22-addons.yaml to harvester/addons. The project-native
+          # test wrapper checks out/generates that dependency before running pkg tests.
+          ./scripts/test
           go build ./...
       - name: Commit validated implementation
         if: github.event_name == 'push'
