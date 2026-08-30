@@ -26,7 +26,9 @@ jobs:
           cache: true
       - name: Apply guarded LayerSentry transformation
         run: |
-          if grep -q 'taskOptionsFunc := interactiveInstallModeOptions' pkg/console/install_panels.go; then
+          # The source variable is askOptionsFunc. Older transform draft had a taskOptionsFunc typo.
+          sed -i 's/taskOptionsFunc/askOptionsFunc/g' scripts/layersentry-transform.py
+          if grep -q 'askOptionsFunc := interactiveInstallModeOptions' pkg/console/install_panels.go; then
             echo "LayerSentry interactive transformation already applied; skipping"
           else
             python3 scripts/layersentry-transform.py
@@ -58,7 +60,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go scripts/package-harvester-os
+          git add pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go scripts/package-harvester-os scripts/layersentry-transform.py
           if git diff --cached --quiet; then
             echo "No generated source changes to commit"
             exit 0
