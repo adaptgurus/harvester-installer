@@ -30,8 +30,8 @@ replace_once(
 # Interactive install modes: exactly Create/Join. Backend ModeInstall logic stays untouched.
 sub_once(
     "pkg/console/install_panels.go",
-    r'func addAskCreatePanel\(c \*Console\) error \{\n\taskOptionsFunc := func\(\) \(\[\]widgets\.Option, error\) \{.*?\n\t\}\n\t// new cluster or join existing cluster',
-    'func addAskCreatePanel(c *Console) error {\n\taskOptionsFunc := interactiveInstallModeOptions\n\t// new cluster or join existing cluster',
+    r'func addAskCreatePanel\(c \*Console\) error \{\n\askOptionsFunc := func\(\) \(\[\]widgets\.Option, error\) \{.*?\n\t\}\n\t// new cluster or join existing cluster',
+    'func addAskCreatePanel(c *Console) error {\n\askOptionsFunc := interactiveInstallModeOptions\n\t// new cluster or join existing cluster',
 )
 replace_once(
     "pkg/console/install_panels.go",
