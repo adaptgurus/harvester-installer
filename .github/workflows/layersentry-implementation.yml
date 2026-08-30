@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - feat/layersentry-installer-v1.0
-  pull_request:
-    branches:
-      - master
 
 permissions:
   contents: write
