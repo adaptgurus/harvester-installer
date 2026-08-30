@@ -26,8 +26,37 @@ jobs:
           cache: true
       - name: Apply guarded LayerSentry transformation
         run: |
-          # The source variable is askOptionsFunc. Older transform draft had a taskOptionsFunc typo.
-          sed -i 's/taskOptionsFunc/askOptionsFunc/g' scripts/layersentry-transform.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/layersentry-transform.py")
+          text = path.read_text()
+
+          # Correct the original transform draft's variable-name typo.
+          text = text.replace("taskOptionsFunc", "askOptionsFunc")
+
+          # Both interactive create-mode paths used the old VIP-mode navigation.
+          # Replace all of them deliberately instead of requiring exactly one match.
+          old = '''replace_once(
+              "pkg/console/install_panels.go",
+              'return showNext(c, vipTextPanel, askVipMethodPanel)',
+              'return showNext(c, interactiveVIPPanels()...)',
+          )
+          '''
+          new = '''text = Path("pkg/console/install_panels.go").read_text()
+          old_vip_navigation = 'return showNext(c, vipTextPanel, askVipMethodPanel)'
+          new_vip_navigation = 'return showNext(c, interactiveVIPPanels()...)'
+          if old_vip_navigation not in text and new_vip_navigation not in text:
+              raise SystemExit("pkg/console/install_panels.go: VIP navigation marker not found")
+          text = text.replace(old_vip_navigation, new_vip_navigation)
+          Path("pkg/console/install_panels.go").write_text(text)
+          '''
+          if old in text:
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
           if grep -q 'askOptionsFunc := interactiveInstallModeOptions' pkg/console/install_panels.go; then
             echo "LayerSentry interactive transformation already applied; skipping"
           else
@@ -56,7 +85,7 @@ jobs:
           go test ./...
           go build ./...
       - name: Commit validated implementation
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
