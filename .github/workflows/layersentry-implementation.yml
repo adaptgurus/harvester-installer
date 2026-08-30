@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/layersentry-installer-v1.0
+  pull_request:
+    branches:
+      - master
 
 permissions:
   contents: write
@@ -15,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: feat/layersentry-installer-v1.0
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
@@ -29,6 +33,7 @@ jobs:
           go test ./...
           go build ./...
       - name: Commit validated implementation
+        if: github.event_name == 'pull_request'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
