@@ -30,8 +30,8 @@ replace_once(
 # Interactive install modes: exactly Create/Join. Backend ModeInstall logic stays untouched.
 sub_once(
     "pkg/console/install_panels.go",
-    r'func addAskCreatePanel\(c \*Console\) error \{\n\ttaskOptionsFunc := func\(\) \(\[\]widgets\.Option, error\) \{.*?\n\t\}\n\t// new cluster or join existing cluster',
-    'func addAskCreatePanel(c *Console) error {\n\ttaskOptionsFunc := interactiveInstallModeOptions\n\t// new cluster or join existing cluster',
+    r'func addAskCreatePanel\(c \*Console\) error \{\n\taskOptionsFunc := func\(\) \(\[\]widgets\.Option, error\) \{.*?\n\t\}\n\t// new cluster or join existing cluster',
+    'func addAskCreatePanel(c *Console) error {\n\taskOptionsFunc := interactiveInstallModeOptions\n\t// new cluster or join existing cluster',
 )
 replace_once(
     "pkg/console/install_panels.go",
@@ -226,11 +226,13 @@ sub_once(
 
 func addNTPServersPanel''',
 )
-replace_once(
-    "pkg/console/install_panels.go",
-    'return showNext(c, vipTextPanel, askVipMethodPanel)',
-    'return showNext(c, interactiveVIPPanels()...)',
-)
+text = Path("pkg/console/install_panels.go").read_text()
+old_vip_navigation = 'return showNext(c, vipTextPanel, askVipMethodPanel)'
+new_vip_navigation = 'return showNext(c, interactiveVIPPanels()...)'
+if old_vip_navigation not in text and new_vip_navigation not in text:
+    raise SystemExit("pkg/console/install_panels.go: VIP navigation marker not found")
+text = text.replace(old_vip_navigation, new_vip_navigation)
+Path("pkg/console/install_panels.go").write_text(text)
 text = Path("pkg/console/install_panels.go").read_text()
 if 'showNext(c, vipTextPanel, askVipMethodPanel)' in text:
     text = text.replace('showNext(c, vipTextPanel, askVipMethodPanel)', 'showNext(c, interactiveVIPPanels()...)')

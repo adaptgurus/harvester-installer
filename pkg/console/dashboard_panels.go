@@ -29,18 +29,15 @@ const (
 	statusReady         = "Ready"
 	statusNotReady      = "NotReady"
 	statusSettingUpNode = "Setting up node"
-	statusSettingUpHarv = "Setting up Harvester"
+	statusSettingUpHarv = "Setting up LayerSentry"
 
 	defaultHarvesterConfig = "/oem/harvester.config"
 	defaultCustomConfig    = "/oem/99_custom.yaml"
 
 	logo string = `
-██╗░░██╗░█████╗░██████╗░██╗░░░██╗███████╗░██████╗████████╗███████╗██████╗░
-██║░░██║██╔══██╗██╔══██╗██║░░░██║██╔════╝██╔════╝╚══██╔══╝██╔════╝██╔══██╗
-███████║███████║█████╔╝╚██╗░░██╔╝█████╗░░╚█████╗░░░░██║░░░█████╗░░██████╔╝
-██╔══██║██╔══██║██╔══██╗░╚████╔╝░██╔══╝░░░╚═══██╗░░░██║░░░██╔══╝░░██╔══██╗
-██║░░██║██║░░██║██║░░██║░░╚██╔╝░░███████╗██████╔╝░░░██║░░░███████╗██║░░██║
-╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═════╝░░░░╚═╝░░░╚══════╝╚═╝░░╚═╝`
++------------------------------------------------------------------------+
+|                              LAYERSENTRY                                |
++------------------------------------------------------------------------+`
 )
 
 type state struct {
@@ -88,7 +85,7 @@ func clusterPanel(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Title = " Harvester Cluster "
+		v.Title = fmt.Sprintf(" %s Cluster ", version.ProductName)
 	}
 	if v, err := g.SetView("managementUrl", maxX/2-39, 10, maxX/2+34, 13); err != nil {
 		if err != gocui.ErrUnknownView {
@@ -155,7 +152,7 @@ func footer(g *gocui.Gui) error {
 			return err
 		}
 		v.Frame = false
-		if _, err = fmt.Fprintf(v, "<Use F12 to switch between Harvester console and Shell>"); err != nil {
+		if _, err = fmt.Fprintf(v, "<Use F12 to switch between %s console and Shell>", version.ProductName); err != nil {
 			return err
 		}
 	}
@@ -172,7 +169,7 @@ func logoPanel(g *gocui.Gui) error {
 		if _, err = fmt.Fprint(v, logo); err != nil {
 			return err
 		}
-		versionStr := "version: " + version.HarvesterVersion
+		versionStr := "version: " + version.ProductVersion
 		logoLength := 74
 		nSpace := logoLength - len(versionStr)
 		if _, err = fmt.Fprintf(v, "\n%*s", nSpace, ""); err != nil {
