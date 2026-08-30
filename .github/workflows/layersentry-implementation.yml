@@ -1,0 +1,41 @@
+name: LayerSentry implementation gate
+
+on:
+  push:
+    branches:
+      - feat/layersentry-installer-v1.0
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Apply guarded LayerSentry transformation
+        run: python3 scripts/layersentry-transform.py
+      - name: Format and validate source
+        run: |
+          gofmt -w pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go pkg/console/layersentry.go pkg/console/layersentry_test.go pkg/version/product.go
+          git diff --check
+          go test ./...
+          go build ./...
+      - name: Commit validated implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go scripts/package-harvester-os
+          if git diff --cached --quiet; then
+            echo "No generated source changes to commit"
+            exit 0
+          fi
+          git commit -m "feat(installer): apply LayerSentry v1.0 interactive workflow"
+          git push origin HEAD:feat/layersentry-installer-v1.0
