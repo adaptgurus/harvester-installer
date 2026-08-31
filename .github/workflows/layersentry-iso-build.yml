@@ -25,6 +25,18 @@ jobs:
           ref: feat/layersentry-installer-v1.0
           fetch-depth: 0
 
+      - name: Validate LayerSentry boot-menu branding
+        shell: bash
+        run: |
+          set -euxo pipefail
+          GRUB=package/harvester-os/iso/boot/grub2/grub.cfg
+          grep -F 'menuentry "LayerSentry Installer ${harvester_version}"' "$GRUB"
+          grep -F 'menuentry "LayerSentry Installer ${harvester_version} (VGA 1024x768)"' "$GRUB"
+          if grep -F 'menuentry "Harvester Installer' "$GRUB"; then
+            echo 'User-visible Harvester boot-menu branding remains in grub.cfg'
+            exit 1
+          fi
+
       - name: Show runner capacity
         shell: bash
         run: |
