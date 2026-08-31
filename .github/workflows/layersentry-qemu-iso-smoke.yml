@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 ovmf
+          sudo apt-get install -y qemu-system-x86 ovmf socat
           qemu-system-x86_64 --version
 
       - name: Download verified LayerSentry ISO artifact
@@ -45,8 +45,11 @@ jobs:
           SUM="$(find /tmp/layersentry-artifact -type f -name 'layersentry-v1.0-amd64.iso.sha512' -print -quit)"
           test -n "$ISO" && test -f "$ISO"
           test -n "$SUM" && test -f "$SUM"
-          cd "$(dirname "$ISO")"
-          sha512sum -c "$(basename "$SUM")"
+          EXPECTED="$(awk 'NF {print tolower($1); exit}' "$SUM")"
+          ACTUAL="$(sha512sum "$ISO" | awk '{print tolower($1)}')"
+          echo "SHA512 expected=$EXPECTED"
+          echo "SHA512 actual  =$ACTUAL"
+          test "$ACTUAL" = "$EXPECTED"
           ls -lh "$ISO" "$SUM"
           echo "iso=$ISO" >> "$GITHUB_OUTPUT"
 
