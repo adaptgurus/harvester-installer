@@ -7,6 +7,11 @@ on:
 
 permissions:
   contents: read
+  actions: write
+
+concurrency:
+  group: layersentry-v1.0-offline-iso
+  cancel-in-progress: true
 
 jobs:
   build-offline-iso:
@@ -19,6 +24,42 @@ jobs:
       DISABLE_BUILD_NET_INSTALL_ISO: "true"
       BUILD_QCOW: "false"
     steps:
+      - name: Cancel every older LayerSentry ISO build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?branch=${GITHUB_REF_NAME}&per_page=100"
+          mapfile -t old_runs < <(
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$api" |
+            jq -r --arg current "$GITHUB_RUN_ID" '
+              .workflow_runs[] |
+              select(.path == ".github/workflows/layersentry-iso-build.yml") |
+              select((.id | tostring) != $current) |
+              select(.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "requested" or .status == "pending") |
+              .id
+            '
+          )
+
+          if [ "${#old_runs[@]}" -eq 0 ]; then
+            echo "No older active LayerSentry ISO builds found."
+          fi
+
+          for run_id in "${old_runs[@]}"; do
+            echo "Cancelling older LayerSentry ISO run ${run_id}"
+            curl --fail --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" >/dev/null
+          done
+
       - name: Checkout LayerSentry installer
         uses: actions/checkout@v4
         with:
@@ -36,6 +77,34 @@ jobs:
             echo 'User-visible Harvester boot-menu branding remains in grub.cfg'
             exit 1
           fi
+
+      - name: Validate simplified LayerSentry installer flow
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -F 'NTPServers: "time.google.com",' pkg/console/install_panels.go
+          grep -F 'VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster.' pkg/console/install_panels.go
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("pkg/console/install_panels.go").read_text()
+
+          proxy_start = text.index("func addProxyPanel")
+          cloud_start = text.index("func addCloudInitPanel")
+          proxy_block = text[proxy_start:cloud_start]
+          if "showNext(c, sshKeyPanel)" in proxy_block:
+              raise SystemExit("SSH page is still reachable from the manual installer")
+          if "showNext(c, confirmInstallPanel)" not in proxy_block:
+              raise SystemExit("proxy page does not advance directly to confirmation")
+
+          confirm_start = text.index("func addConfirmInstallPanel")
+          confirm_end = text.index("func addConfirmUpgradePanel")
+          confirm_block = text[confirm_start:confirm_end]
+          if "showNext(c, cloudInitPanel)" in confirm_block:
+              raise SystemExit("remote LayerSentry config page is still reachable from confirmation")
+          if "showNext(c, proxyPanel)" not in confirm_block:
+              raise SystemExit("confirmation does not return to the last visible page")
+          PY
 
       - name: Show runner capacity
         shell: bash
