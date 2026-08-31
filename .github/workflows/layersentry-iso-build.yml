@@ -1,0 +1,70 @@
+name: LayerSentry v1.0 offline ISO
+
+on:
+  push:
+    branches:
+      - feat/layersentry-installer-v1.0
+
+permissions:
+  contents: read
+
+jobs:
+  build-offline-iso:
+    if: contains(github.event.head_commit.message, '[build-iso]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      DRONE_TAG: v1.0
+      DRONE_BRANCH: feat/layersentry-installer-v1.0
+      DISABLE_BUILD_NET_INSTALL_ISO: "true"
+      BUILD_QCOW: "false"
+    steps:
+      - name: Checkout LayerSentry installer
+        uses: actions/checkout@v4
+        with:
+          ref: feat/layersentry-installer-v1.0
+          fetch-depth: 0
+
+      - name: Show runner capacity
+        shell: bash
+        run: |
+          df -h
+          docker system df || true
+
+      - name: Build full offline ISO with native Harvester pipeline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          make default
+
+      - name: Verify and name LayerSentry ISO
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p dist/layersentry-release
+          mapfile -t full_isos < <(find dist/artifacts -maxdepth 1 -type f -name '*-amd64.iso' ! -name '*-net-install.iso' -print)
+          if [ "${#full_isos[@]}" -ne 1 ]; then
+            echo "Expected exactly one full amd64 ISO, found ${#full_isos[@]}"
+            printf '%s\n' "${full_isos[@]}"
+            find dist/artifacts -maxdepth 1 -type f -printf '%f\n' | sort
+            exit 1
+          fi
+          cp "${full_isos[0]}" dist/layersentry-release/layersentry-v1.0-amd64.iso
+          sha512sum dist/layersentry-release/layersentry-v1.0-amd64.iso > dist/layersentry-release/layersentry-v1.0-amd64.iso.sha512
+          if find dist/artifacts -maxdepth 1 -type f -name '*-net-install.iso' | grep -q .; then
+            echo "Network/HTTP net-install ISO must not be generated"
+            exit 1
+          fi
+          ls -lh dist/layersentry-release
+          cat dist/layersentry-release/layersentry-v1.0-amd64.iso.sha512
+
+      - name: Upload LayerSentry ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-amd64-offline-iso
+          path: |
+            dist/layersentry-release/layersentry-v1.0-amd64.iso
+            dist/layersentry-release/layersentry-v1.0-amd64.iso.sha512
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
