@@ -8,6 +8,9 @@ BUNDLE_DIR="${PACKAGE_HARVESTER_OS_DIR}/iso/bundle"
 IMAGES_LISTS_DIR="${BUNDLE_DIR}/harvester/images-lists"
 RANCHERD_IMAGES_DIR="${BUNDLE_DIR}/rancherd/images"
 VERSION_FILE="version.yaml"
+
+# LayerSentry publishes the full offline ISO only; hide the network/HTTP net-install ISO artifact.
+DISABLE_BUILD_NET_INSTALL_ISO=true
 if [ "${ARCH}" == "arm64" ]
 then
   VERSION_FILE="version-arm64.yaml"
@@ -36,13 +39,14 @@ HARVESTER_OS_IMAGE=rancher/harvester-os:$VERSION
 
 cd ${PACKAGE_HARVESTER_OS_DIR}
 
-PRETTY_NAME="Harvester ${VERSION}"
+PRETTY_NAME="LayerSentry 1.0"
+BASE_OS_RELEASE_NAME="Harvester ${VERSION}"
 
 cat > harvester-release.yaml <<EOF
 harvester: ${HARVESTER_VERSION}
 harvesterChart: ${HARVESTER_CHART_VERSION}
 installer: ${COMMIT}
-os: ${PRETTY_NAME}
+os: ${BASE_OS_RELEASE_NAME}
 kubernetes: ${RKE2_VERSION}
 rancher: ${RANCHER_VERSION}
 monitoringChart: ${MONITORING_VERSION}

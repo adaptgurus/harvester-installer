@@ -1,0 +1,151 @@
+name: LayerSentry v1.0 offline ISO
+
+on:
+  push:
+    branches:
+      - feat/layersentry-installer-v1.0
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: layersentry-v1.0-offline-iso
+  cancel-in-progress: true
+
+jobs:
+  build-offline-iso:
+    if: contains(github.event.head_commit.message, '[build-iso]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      DRONE_TAG: v1.0
+      DRONE_BRANCH: feat/layersentry-installer-v1.0
+      DISABLE_BUILD_NET_INSTALL_ISO: "true"
+      BUILD_QCOW: "false"
+    steps:
+      - name: Cancel every older LayerSentry ISO build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?branch=${GITHUB_REF_NAME}&per_page=100"
+          mapfile -t old_runs < <(
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$api" |
+            jq -r --arg current "$GITHUB_RUN_ID" '
+              .workflow_runs[] |
+              select(.path == ".github/workflows/layersentry-iso-build.yml") |
+              select((.id | tostring) != $current) |
+              select(.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "requested" or .status == "pending") |
+              .id
+            '
+          )
+
+          if [ "${#old_runs[@]}" -eq 0 ]; then
+            echo "No older active LayerSentry ISO builds found."
+          fi
+
+          for run_id in "${old_runs[@]}"; do
+            echo "Cancelling older LayerSentry ISO run ${run_id}"
+            curl --fail --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" >/dev/null
+          done
+
+      - name: Checkout LayerSentry installer
+        uses: actions/checkout@v4
+        with:
+          ref: feat/layersentry-installer-v1.0
+          fetch-depth: 0
+
+      - name: Validate LayerSentry boot-menu branding
+        shell: bash
+        run: |
+          set -euxo pipefail
+          GRUB=package/harvester-os/iso/boot/grub2/grub.cfg
+          grep -F 'menuentry "LayerSentry Installer ${harvester_version}"' "$GRUB"
+          grep -F 'menuentry "LayerSentry Installer ${harvester_version} (VGA 1024x768)"' "$GRUB"
+          if grep -F 'menuentry "Harvester Installer' "$GRUB"; then
+            echo 'User-visible Harvester boot-menu branding remains in grub.cfg'
+            exit 1
+          fi
+
+      - name: Validate simplified LayerSentry installer flow
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -F 'NTPServers: "time.google.com",' pkg/console/install_panels.go
+          grep -F 'VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster.' pkg/console/install_panels.go
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("pkg/console/install_panels.go").read_text()
+
+          proxy_start = text.index("func addProxyPanel")
+          cloud_start = text.index("func addCloudInitPanel")
+          proxy_block = text[proxy_start:cloud_start]
+          if "showNext(c, sshKeyPanel)" in proxy_block:
+              raise SystemExit("SSH page is still reachable from the manual installer")
+          if "showNext(c, confirmInstallPanel)" not in proxy_block:
+              raise SystemExit("proxy page does not advance directly to confirmation")
+
+          confirm_start = text.index("func addConfirmInstallPanel")
+          confirm_end = text.index("func addConfirmUpgradePanel")
+          confirm_block = text[confirm_start:confirm_end]
+          if "showNext(c, cloudInitPanel)" in confirm_block:
+              raise SystemExit("remote LayerSentry config page is still reachable from confirmation")
+          if "showNext(c, proxyPanel)" not in confirm_block:
+              raise SystemExit("confirmation does not return to the last visible page")
+          PY
+
+      - name: Show runner capacity
+        shell: bash
+        run: |
+          df -h
+          docker system df || true
+
+      - name: Build full offline ISO with native Harvester pipeline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          make default
+
+      - name: Verify and name LayerSentry ISO
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p dist/layersentry-release
+          mapfile -t full_isos < <(find dist/artifacts -maxdepth 1 -type f -name '*-amd64.iso' ! -name '*-net-install.iso' -print)
+          if [ "${#full_isos[@]}" -ne 1 ]; then
+            echo "Expected exactly one full amd64 ISO, found ${#full_isos[@]}"
+            printf '%s\n' "${full_isos[@]}"
+            find dist/artifacts -maxdepth 1 -type f -printf '%f\n' | sort
+            exit 1
+          fi
+          cp "${full_isos[0]}" dist/layersentry-release/layersentry-v1.0-amd64.iso
+          sha512sum dist/layersentry-release/layersentry-v1.0-amd64.iso > dist/layersentry-release/layersentry-v1.0-amd64.iso.sha512
+          if find dist/artifacts -maxdepth 1 -type f -name '*-net-install.iso' | grep -q .; then
+            echo "Network/HTTP net-install ISO must not be generated"
+            exit 1
+          fi
+          ls -lh dist/layersentry-release
+          cat dist/layersentry-release/layersentry-v1.0-amd64.iso.sha512
+
+      - name: Upload LayerSentry ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-amd64-offline-iso
+          path: |
+            dist/layersentry-release/layersentry-v1.0-amd64.iso
+            dist/layersentry-release/layersentry-v1.0-amd64.iso.sha512
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

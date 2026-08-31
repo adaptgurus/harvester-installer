@@ -1,0 +1,127 @@
+name: LayerSentry implementation gate
+
+on:
+  push:
+    branches:
+      - feat/layersentry-installer-v1.0
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/layersentry-installer-v1.0
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Apply guarded LayerSentry transformation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/layersentry-transform.py")
+          text = path.read_text()
+
+          # Correct the original transform draft's variable-name typo.
+          text = text.replace("taskOptionsFunc", "askOptionsFunc")
+
+          # Both interactive create-mode paths used the old VIP-mode navigation.
+          # Replace all of them deliberately instead of requiring exactly one match.
+          old = '''replace_once(
+              "pkg/console/install_panels.go",
+              'return showNext(c, vipTextPanel, askVipMethodPanel)',
+              'return showNext(c, interactiveVIPPanels()...)',
+          )
+          '''
+          new = '''text = Path("pkg/console/install_panels.go").read_text()
+          old_vip_navigation = 'return showNext(c, vipTextPanel, askVipMethodPanel)'
+          new_vip_navigation = 'return showNext(c, interactiveVIPPanels()...)'
+          if old_vip_navigation not in text and new_vip_navigation not in text:
+              raise SystemExit("pkg/console/install_panels.go: VIP navigation marker not found")
+          text = text.replace(old_vip_navigation, new_vip_navigation)
+          Path("pkg/console/install_panels.go").write_text(text)
+          '''
+          if old in text:
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+          if grep -q 'askOptionsFunc := interactiveInstallModeOptions' pkg/console/install_panels.go; then
+            echo "LayerSentry interactive transformation already applied; skipping"
+          else
+            python3 scripts/layersentry-transform.py
+          fi
+
+          # Apply the current LayerSentry interactive-flow policy idempotently.
+          # This keeps SSH and remote-config backend support while hiding those
+          # two optional screens from the manual installer.
+          python3 scripts/layersentry-ui-flow-update.py
+      - name: Suppress network HTTP ISO artifact
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/package-harvester-os")
+          text = path.read_text()
+          marker = "DISABLE_BUILD_NET_INSTALL_ISO=true"
+          if marker not in text:
+              anchor = 'VERSION_FILE="version.yaml"\n'
+              if text.count(anchor) != 1:
+                  raise SystemExit("unable to locate VERSION_FILE anchor in scripts/package-harvester-os")
+              replacement = anchor + '\n# LayerSentry publishes the full offline ISO only; hide the network/HTTP net-install ISO artifact.\nDISABLE_BUILD_NET_INSTALL_ISO=true\n'
+              text = text.replace(anchor, replacement, 1)
+              path.write_text(text)
+          PY
+      - name: Validate LayerSentry interactive-flow policy
+        run: |
+          set -euxo pipefail
+          grep -F 'NTPServers: "time.google.com",' pkg/console/install_panels.go
+          grep -F 'VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster.' pkg/console/install_panels.go
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("pkg/console/install_panels.go").read_text()
+          proxy_start = text.index("func addProxyPanel")
+          cloud_start = text.index("func addCloudInitPanel")
+          proxy_block = text[proxy_start:cloud_start]
+          if "showNext(c, sshKeyPanel)" in proxy_block:
+              raise SystemExit("SSH screen is still reachable from the interactive proxy page")
+          if "showNext(c, confirmInstallPanel)" not in proxy_block:
+              raise SystemExit("interactive proxy page does not advance directly to confirmation")
+
+          confirm_start = text.index("func addConfirmInstallPanel")
+          confirm_end = text.index("func addConfirmUpgradePanel")
+          confirm_block = text[confirm_start:confirm_end]
+          if "showNext(c, cloudInitPanel)" in confirm_block:
+              raise SystemExit("remote LayerSentry config screen is still reachable from confirmation")
+          if "showNext(c, proxyPanel)" not in confirm_block:
+              raise SystemExit("confirmation page does not return to the visible proxy page")
+          PY
+      - name: Format and validate source
+        run: |
+          gofmt -w pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go pkg/console/layersentry.go pkg/console/layersentry_test.go pkg/version/product.go
+          git diff --check
+          # Harvester moved rancherd-22-addons.yaml to harvester/addons. The project-native
+          # test wrapper checks out/generates that dependency before running pkg tests.
+          ./scripts/test
+          go build ./...
+      - name: Commit validated implementation
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go scripts/package-harvester-os scripts/layersentry-transform.py scripts/layersentry-ui-flow-update.py
+          if git diff --cached --quiet; then
+            echo "No generated source changes to commit"
+            exit 0
+          fi
+          git commit -m "feat(installer): apply LayerSentry v1.0 interactive workflow"
+          git push origin HEAD:feat/layersentry-installer-v1.0

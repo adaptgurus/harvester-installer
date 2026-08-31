@@ -1,0 +1,201 @@
+name: LayerSentry Hyper-V ISO smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/layersentry-installer-v1.0
+    paths:
+      - .github/workflows/layersentry-hyperv-smoke.yml
+
+permissions:
+  contents: read
+  actions: read
+
+defaults:
+  run:
+    shell: powershell
+
+jobs:
+  hyperv-iso-smoke:
+    name: Boot LayerSentry ISO on Hyper-V
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 90
+    env:
+      ISO_RUN_ID: '33370121624'
+      ISO_ARTIFACT_NAME: layersentry-v1.0-amd64-offline-iso
+      LAB_ROOT: C:\LayerSentrySmoke
+      GEN2_VM: layersentry-smoke-gen2
+      GEN1_VM: layersentry-smoke-gen1
+    steps:
+      - name: Validate Hyper-V runner and free space
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Host "Runner=$env:RUNNER_NAME Computer=$env:COMPUTERNAME"
+          $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+          if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw 'Self-hosted runner is not elevated; Hyper-V boot smoke requires administrator rights.'
+          }
+          Get-Command Get-VM, New-VM, Add-VMDvdDrive, Start-VM, Set-VMFirmware, Set-VMBios | Format-Table Name,Source
+          Get-VMHost | Format-List ComputerName,LogicalProcessorCount
+          $drive = Get-PSDrive -Name C
+          $freeGB = [math]::Round($drive.Free / 1GB, 2)
+          Write-Host "C: free space = $freeGB GiB"
+          if ($drive.Free -lt 25GB) { throw "Need at least 25 GiB free on C: to download and inspect the 8.57 GB ISO artifact; only $freeGB GiB available." }
+          New-Item -ItemType Directory -Force -Path $env:LAB_ROOT | Out-Null
+
+      - name: Prepare artifact directory
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactDir = Join-Path $env:LAB_ROOT 'artifact'
+          if (Test-Path $artifactDir) { Remove-Item -Recurse -Force $artifactDir }
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      - name: Download verified LayerSentry ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: layersentry-v1.0-amd64-offline-iso
+          path: C:\LayerSentrySmoke\artifact
+          repository: adaptgurus/harvester-installer
+          run-id: 33370121624
+          github-token: ${{ github.token }}
+
+      - name: Verify SHA-512 and ISO boot files
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactDir = Join-Path $env:LAB_ROOT 'artifact'
+          $iso = Get-ChildItem $artifactDir -Filter 'layersentry-v1.0-amd64.iso' -File -Recurse | Select-Object -First 1
+          $sum = Get-ChildItem $artifactDir -Filter 'layersentry-v1.0-amd64.iso.sha512' -File -Recurse | Select-Object -First 1
+          if (-not $iso) { throw 'LayerSentry ISO was not found after artifact download.' }
+          if (-not $sum) { throw 'LayerSentry SHA-512 file was not found after artifact download.' }
+          $expected = ((Get-Content $sum.FullName -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -Path $iso.FullName -Algorithm SHA512).Hash.ToLowerInvariant()
+          Write-Host "ISO=$($iso.FullName)"
+          Write-Host "ISO size=$([math]::Round($iso.Length/1GB,3)) GiB"
+          Write-Host "SHA512 expected=$expected"
+          Write-Host "SHA512 actual  =$actual"
+          if ($actual -ne $expected) { throw 'LayerSentry ISO SHA-512 mismatch.' }
+
+          $disk = Mount-DiskImage -ImagePath $iso.FullName -PassThru
+          try {
+            $volume = $disk | Get-Volume | Where-Object DriveLetter | Select-Object -First 1
+            if (-not $volume) { throw 'Windows mounted the ISO but did not expose a readable volume.' }
+            $root = "$($volume.DriveLetter):\"
+            $required = @(
+              'EFI\BOOT\BOOTX64.EFI',
+              'boot\grub2\grub.cfg',
+              'rootfs.squashfs'
+            )
+            foreach ($relative in $required) {
+              $path = Join-Path $root $relative
+              Write-Host "Checking $path"
+              if (-not (Test-Path $path)) { throw "Required boot payload missing from ISO: $relative" }
+            }
+            Get-ChildItem $root | Select-Object Name,Length,Mode | Format-Table -AutoSize
+          }
+          finally {
+            Dismount-DiskImage -ImagePath $iso.FullName -ErrorAction SilentlyContinue
+          }
+          Set-Content -Path (Join-Path $env:LAB_ROOT 'iso-path.txt') -Value $iso.FullName
+
+      - name: Create disposable Generation 2 and Generation 1 boot VMs
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iso = Get-Content (Join-Path $env:LAB_ROOT 'iso-path.txt') -Raw
+          $iso = $iso.Trim()
+          $names = @($env:GEN2_VM, $env:GEN1_VM)
+          foreach ($name in $names) {
+            $old = Get-VM -Name $name -ErrorAction SilentlyContinue
+            if ($old) {
+              if ($old.State -ne 'Off') { Stop-VM -Name $name -TurnOff -Force }
+              Remove-VM -Name $name -Force
+            }
+          }
+
+          New-VM -Name $env:GEN2_VM -Generation 2 -MemoryStartupBytes 8GB -NoVHD | Out-Null
+          Set-VMProcessor -VMName $env:GEN2_VM -Count 4
+          Set-VMMemory -VMName $env:GEN2_VM -DynamicMemoryEnabled $false
+          Set-VMFirmware -VMName $env:GEN2_VM -EnableSecureBoot Off
+          $dvd2 = Add-VMDvdDrive -VMName $env:GEN2_VM -Path $iso -Passthru
+          Set-VMFirmware -VMName $env:GEN2_VM -FirstBootDevice $dvd2
+
+          New-VM -Name $env:GEN1_VM -Generation 1 -MemoryStartupBytes 8GB -NoVHD | Out-Null
+          Set-VMProcessor -VMName $env:GEN1_VM -Count 4
+          Set-VMMemory -VMName $env:GEN1_VM -DynamicMemoryEnabled $false
+          Add-VMDvdDrive -VMName $env:GEN1_VM -ControllerNumber 1 -ControllerLocation 0 -Path $iso | Out-Null
+          Set-VMBios -VMName $env:GEN1_VM -StartupOrder CD,IDE,LegacyNetworkAdapter,Floppy
+
+          Write-Host '==== Generation 2 firmware ===='
+          Get-VMFirmware -VMName $env:GEN2_VM | Format-List SecureBoot,BootOrder
+          Get-VMDvdDrive -VMName $env:GEN2_VM | Format-List Path,ControllerType,ControllerNumber,ControllerLocation
+          Write-Host '==== Generation 1 BIOS/DVD ===='
+          Get-VMBios -VMName $env:GEN1_VM | Format-List StartupOrder
+          Get-VMDvdDrive -VMName $env:GEN1_VM | Format-List Path,ControllerType,ControllerNumber,ControllerLocation
+
+      - name: Boot both VMs and capture console evidence
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.Drawing
+
+          function Save-VMScreenBMP {
+            param([string]$VMName, [string]$Path)
+            try {
+              $vmms = Get-WmiObject -Namespace root\virtualization\v2 -Class Msvm_VirtualSystemManagementService
+              $safeName = $VMName.Replace("'", "''")
+              $vmcs = Get-WmiObject -Namespace root\virtualization\v2 -Class Msvm_ComputerSystem -Filter "ElementName='$safeName'"
+              if (-not $vmcs) { throw "WMI VM not found: $VMName" }
+              $video = @($vmcs.GetRelated('Msvm_VideoHead')) | Select-Object -First 1
+              $width = [int]$video.CurrentHorizontalResolution
+              $height = [int]$video.CurrentVerticalResolution
+              if ($width -lt 64 -or $height -lt 64) { $width = 1024; $height = 768 }
+              $image = $vmms.GetVirtualSystemThumbnailImage($vmcs, $width, $height).ImageData
+              if (-not $image) { throw 'Hyper-V returned no framebuffer bytes.' }
+              $bitmap = New-Object System.Drawing.Bitmap -ArgumentList $width,$height,[System.Drawing.Imaging.PixelFormat]::Format16bppRgb565
+              $rect = New-Object System.Drawing.Rectangle 0,0,$width,$height
+              $data = $bitmap.LockBits($rect,[System.Drawing.Imaging.ImageLockMode]::ReadWrite,[System.Drawing.Imaging.PixelFormat]::Format16bppRgb565)
+              try {
+                [System.Runtime.InteropServices.Marshal]::Copy($image,0,$data.Scan0,[math]::Abs($data.Stride)*$data.Height)
+              } finally {
+                $bitmap.UnlockBits($data)
+              }
+              $bitmap.Save($Path,[System.Drawing.Imaging.ImageFormat]::Bmp)
+              $bitmap.Dispose()
+              Write-Host "Saved framebuffer: $Path (${width}x${height})"
+            } catch {
+              Write-Warning "Could not capture framebuffer for $VMName : $($_.Exception.Message)"
+            }
+          }
+
+          $evidence = Join-Path $env:LAB_ROOT 'evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          Start-VM -Name $env:GEN2_VM
+          Start-VM -Name $env:GEN1_VM
+
+          foreach ($delay in 20,40,60) {
+            Start-Sleep -Seconds $delay
+            $elapsed = if ($delay -eq 20) { 20 } elseif ($delay -eq 40) { 60 } else { 120 }
+            foreach ($name in @($env:GEN2_VM,$env:GEN1_VM)) {
+              $vm = Get-VM -Name $name
+              if ($vm.State -ne 'Running') { throw "$name left Running state during boot smoke: $($vm.State)" }
+              Save-VMScreenBMP -VMName $name -Path (Join-Path $evidence "$name-$elapsed-sec.bmp")
+            }
+          }
+
+          Get-VM -Name $env:GEN2_VM,$env:GEN1_VM |
+            Select-Object Name,State,Status,Generation,CPUUsage,MemoryAssigned,Uptime |
+            Format-Table -AutoSize |
+            Out-String | Tee-Object -FilePath (Join-Path $evidence 'vm-state.txt')
+          Get-VMDvdDrive -VMName $env:GEN2_VM,$env:GEN1_VM |
+            Format-List VMName,Path,ControllerType,ControllerNumber,ControllerLocation |
+            Out-String | Add-Content (Join-Path $evidence 'vm-state.txt')
+          Write-Host 'Both disposable VMs are intentionally left running for manual VMConnect inspection.'
+
+      - name: Upload Hyper-V boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-hyperv-boot-evidence
+          path: C:\LayerSentrySmoke\evidence
+          if-no-files-found: warn
+          retention-days: 7

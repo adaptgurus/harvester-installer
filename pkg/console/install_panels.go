@@ -53,7 +53,7 @@ const (
 var (
 	once          sync.Once
 	userInputData = UserInputData{
-		NTPServers: "0.suse.pool.ntp.org",
+		NTPServers: "time.google.com",
 	}
 	mgmtNetwork = config.Network{
 		DefaultRoute: true,
@@ -325,7 +325,7 @@ func addDiskPanel(c *Console) error {
 	diskFatalV.FgColor = gocui.ColorRed
 	diskFatalV.Wrap = true
 	diskFatalV.PreShow = func() error {
-		diskFatalV.SetContent("No disk detected. Harvester requires at least one disk.")
+		diskFatalV.SetContent(fmt.Sprintf("No disk detected. %s requires at least one disk.", version.ProductName))
 		return setPageTitle()
 	}
 	setLocation(diskFatalV, 3)
@@ -401,7 +401,7 @@ func addDiskPanel(c *Console) error {
 
 	// WipeDisksPanel
 	wipeDisksTitlePanelV := widgets.NewPanel(c.Gui, wipeDisksTitlePanel)
-	wipeDisksTitlePanelV.SetContent("Additional Harvester installations detected")
+	wipeDisksTitlePanelV.SetContent(fmt.Sprintf("Additional %s installations detected", version.ProductName))
 	wipeDisksTitlePanelV.FgColor = gocui.ColorRed
 	setLocation(wipeDisksTitlePanelV, 3)
 	c.AddElement(wipeDisksTitlePanel, wipeDisksTitlePanelV)
@@ -785,28 +785,7 @@ func addPreflightCheckPanel(c *Console) error {
 }
 
 func addAskCreatePanel(c *Console) error {
-	askOptionsFunc := func() ([]widgets.Option, error) {
-		options := []widgets.Option{
-			{
-				Value: config.ModeCreate,
-				Text:  "Create a new Harvester cluster",
-			}, {
-				Value: config.ModeJoin,
-				Text:  "Join an existing Harvester cluster",
-			},
-		}
-
-		// layoutInstall is now called from layoutDashboard due to the addition
-		// of the new config.ModeInstall. config will be setup by layoutDashboard before passing control here
-		// this extra option should only show up if that is not the case
-		if !alreadyInstalled {
-			options = append(options, widgets.Option{
-				Value: config.ModeInstall,
-				Text:  "Install Harvester binaries only",
-			})
-		}
-		return options, nil
-	}
+	askOptionsFunc := interactiveInstallModeOptions
 	// new cluster or join existing cluster
 	askCreateV, err := widgets.NewSelect(c.Gui, askCreatePanel, "", askOptionsFunc)
 	if err != nil {
@@ -819,9 +798,13 @@ func addAskCreatePanel(c *Console) error {
 		// of the initial preflight checks failed, or if the later network
 		// speed check fails.
 		preflightAck = true
-		askCreateV.Value = c.config.Install.Mode
+		if c.config.Install.Mode == config.ModeCreate || c.config.Install.Mode == config.ModeJoin {
+			askCreateV.Value = c.config.Install.Mode
+		} else {
+			askCreateV.Value = ""
+		}
 		if alreadyInstalled {
-			return c.setContentByName(titlePanel, "Harvester already installed. Choose configuration mode")
+			return c.setContentByName(titlePanel, fmt.Sprintf("%s already installed. Choose configuration mode", version.ProductName))
 		}
 		return c.setContentByName(titlePanel, "Choose installation mode")
 	}
@@ -1292,7 +1275,7 @@ func addTokenPanel(c *Console) error {
 			}
 			if c.config.Install.Mode == config.ModeCreate {
 				g.Cursor = false
-				return showNext(c, vipTextPanel, askVipMethodPanel)
+				return showNext(c, interactiveVIPPanels()...)
 			}
 			return showNext(c, serverURLPanel)
 		},
@@ -1302,10 +1285,8 @@ func addTokenPanel(c *Console) error {
 }
 
 func showNetworkPage(c *Console) error {
-	if mgmtNetwork.Method != config.NetworkMethodStatic {
-		return showNext(c, askVlanIDPanel, askBondModePanel, askNetworkMethodPanel, askInterfacePanel)
-	}
-	return showNext(c, askVlanIDPanel, askBondModePanel, askNetworkMethodPanel, addressPanel, addrMaskPanel, gatewayPanel, mtuPanel, askInterfacePanel)
+	mgmtNetwork.Method = config.NetworkMethodStatic
+	return showNext(c, interactiveNetworkPanels()...)
 }
 
 func showHostnamePage(c *Console) error {
@@ -1656,8 +1637,8 @@ func addNetworkPanel(c *Console) error {
 	}
 	validateInterface := func() (string, error) {
 		ifaces := askInterfaceV.GetMultiData()
-		if len(ifaces) == 0 {
-			return "Must select at least one interface", nil
+		if err := validateManagementInterfaceSelection(ifaces); err != nil {
+			return err.Error(), nil
 		}
 		interfaces := make([]config.NetworkInterface, 0, len(ifaces))
 		for _, iface := range ifaces {
@@ -1745,20 +1726,18 @@ func addNetworkPanel(c *Console) error {
 	}
 	askBondModeVConfirm := func(_ *gocui.Gui, _ *gocui.View) error {
 		mode, err := askBondModeV.GetData()
+		if err != nil {
+			return err
+		}
 		mgmtNetwork.BondOptions = map[string]string{
 			"mode":   mode,
 			"miimon": "100",
 		}
-		if err != nil {
-			return err
-		}
+		mgmtNetwork.Method = config.NetworkMethodStatic
 		if err := showBondNote(); err != nil {
 			return err
 		}
-		if mgmtNetwork.Method != config.NetworkMethodStatic {
-			return showNext(c, askNetworkMethodPanel)
-		}
-		return showNext(c, mtuPanel, gatewayPanel, addressPanel, askNetworkMethodPanel)
+		return showNext(c, mtuPanel, gatewayPanel, addrMaskPanel, addressPanel)
 	}
 	askBondModeV.KeyBindings = map[gocui.Key]func(*gocui.Gui, *gocui.View) error{
 		gocui.KeyArrowUp:   gotoNextPanel(c, []string{askVlanIDPanel}),
@@ -1807,13 +1786,9 @@ func addNetworkPanel(c *Console) error {
 			return err.Error(), nil
 		}
 		userInputData.Address = address
-		ip, ipNet, err := net.ParseCIDR(address)
+		ip, ipNet, err := parseStaticIPv4Address(address)
 		if err != nil {
-			// It's not a CIDR address, but it might be a non-CIDR address
-			ip = net.ParseIP(address)
-			if ip == nil {
-				return fmt.Sprintf("%s is not a valid IP address", address), nil
-			}
+			return err.Error(), nil
 		}
 		// At this point, ip is valid (so save it) but ipNet might be nil (non-CIDR address)
 		mgmtNetwork.IP = ip.String()
@@ -1826,7 +1801,7 @@ func addNetworkPanel(c *Console) error {
 	}
 	addressVConfirm := gotoNextPanel(c, []string{addrMaskPanel}, validateAddress)
 	addressV.KeyBindings = map[gocui.Key]func(*gocui.Gui, *gocui.View) error{
-		gocui.KeyArrowUp: gotoNextPanel(c, []string{askNetworkMethodPanel}, func() (string, error) {
+		gocui.KeyArrowUp: gotoNextPanel(c, []string{askBondModePanel}, func() (string, error) {
 			userInputData.Address, err = addressV.GetData()
 			return "", err
 		}),
@@ -1886,7 +1861,7 @@ func addNetworkPanel(c *Console) error {
 		if err = checkStaticRequiredString("gateway", gateway); err != nil {
 			return err.Error(), nil
 		}
-		if err = checkIP(gateway); err != nil {
+		if err = validateStaticGateway(mgmtNetwork.IP, mgmtNetwork.SubnetMask, gateway); err != nil {
 			return err.Error(), nil
 		}
 		mgmtNetwork.Gateway = gateway
@@ -2325,7 +2300,7 @@ func addProxyPanel(c *Console) error {
 			if err = noteV.Close(); err != nil {
 				return err
 			}
-			return showNext(c, sshKeyPanel)
+			return showNext(c, confirmInstallPanel)
 		},
 		gocui.KeyEsc: func(_ *gocui.Gui, _ *gocui.View) error {
 			if err := proxyV.Close(); err != nil {
@@ -2347,7 +2322,7 @@ func addCloudInitPanel(c *Console) error {
 	cloudInitV.PreShow = func() error {
 		c.Gui.Cursor = true
 		cloudInitV.Value = c.config.Install.ConfigURL
-		return c.setContentByName(titlePanel, "Optional: remote Harvester config")
+		return c.setContentByName(titlePanel, fmt.Sprintf("Optional: remote %s config", version.ProductName))
 	}
 	gotoNextPage := func() error {
 		if err := cloudInitV.Close(); err != nil {
@@ -2457,14 +2432,11 @@ func addConfirmInstallPanel(c *Console) error {
 		logrus.Debug("cfm cfg: ", fmt.Sprintf("%+v", c.config.Install))
 		if !c.config.Install.Silent {
 			if alreadyInstalled {
-				confirmV.SetContent(options +
-					"\nHarvester is already installed. It will be configured with the above configuration. Continue?\n")
+				confirmV.SetContent(options + fmt.Sprintf("\n%s is already installed. It will be configured with the above configuration. Continue?\n", version.ProductName))
 			} else if installModeOnly {
-				confirmV.SetContent(options +
-					"\nHarvester will be copied to local disk. No configuration will be performed. Continue?\n")
+				confirmV.SetContent(options + fmt.Sprintf("\n%s will be copied to local disk. No configuration will be performed. Continue?\n", version.ProductName))
 			} else {
-				confirmV.SetContent(options +
-					"\nYour disk will be formatted and Harvester will be installed with the above configuration. Continue?\n")
+				confirmV.SetContent(options + fmt.Sprintf("\nYour disk will be formatted and %s will be installed with the above configuration. Continue?\n", version.ProductName))
 			}
 		}
 		c.Gui.Cursor = false
@@ -2501,7 +2473,7 @@ func addConfirmInstallPanel(c *Console) error {
 			if installModeOnly {
 				return showDiskPage(c)
 			}
-			return showNext(c, cloudInitPanel)
+			return showNext(c, proxyPanel)
 		},
 	}
 	c.AddElement(confirmInstallPanel, confirmV)
@@ -2525,7 +2497,7 @@ func addConfirmUpgradePanel(c *Console) error {
 		return err
 	}
 	confirmV.PreShow = func() error {
-		return c.setContentByName(titlePanel, fmt.Sprintf("Confirm upgrading Harvester to %s?", version.Version))
+		return c.setContentByName(titlePanel, fmt.Sprintf("Confirm upgrading %s to %s?", version.ProductName, version.Version))
 	}
 	confirmV.KeyBindings = map[gocui.Key]func(*gocui.Gui, *gocui.View) error{
 		gocui.KeyEnter: func(_ *gocui.Gui, _ *gocui.View) error {
@@ -2714,7 +2686,7 @@ func addInstallPanel(c *Console) error {
 		}()
 		return c.setContentByName(footerPanel, "")
 	}
-	installV.Title = " Installing Harvester "
+	installV.Title = fmt.Sprintf(" Installing %s ", version.ProductName)
 	installV.SetLocation(maxX/8, maxY/8, maxX/8*7, maxY/8*7)
 	installV.Wrap = true
 	installV.Autoscroll = true
@@ -2739,7 +2711,7 @@ func addUpgradePanel(c *Console) error {
 		go doUpgrade(c.Gui) //nolint:errcheck
 		return c.setContentByName(footerPanel, "")
 	}
-	upgradeV.Title = " Upgrading Harvester "
+	upgradeV.Title = fmt.Sprintf(" Upgrading %s ", version.ProductName)
 	upgradeV.SetLocation(maxX/8, maxY/8, maxX/8*7, maxY/8*7)
 	c.AddElement(upgradePanel, upgradeV)
 	upgradeV.Frame = true
@@ -2749,30 +2721,15 @@ func addUpgradePanel(c *Console) error {
 func addVIPPanel(c *Console) error {
 	setLocation := createVerticalLocator(c)
 
-	askVipMethodV, err := widgets.NewDropDown(c.Gui, askVipMethodPanel, askVipMethodLabel, getNetworkMethodOptions)
-	if err != nil {
-		return err
-	}
-	hwAddrV, err := widgets.NewInput(c.Gui, vipHwAddrPanel, vipHwAddrLabel, false)
-	if err != nil {
-		return err
-	}
 	vipV, err := widgets.NewInput(c.Gui, vipPanel, vipLabel, false)
 	if err != nil {
 		return err
 	}
-	hwAddrNoteV := widgets.NewPanel(c.Gui, vipHwAddrNotePanel)
 	vipTextV := widgets.NewPanel(c.Gui, vipTextPanel)
 
 	closeThisPage := func() {
-		c.CloseElements(
-			askVipMethodPanel,
-			vipHwAddrPanel,
-			vipHwAddrNotePanel,
-			vipPanel,
-			vipTextPanel)
+		c.CloseElements(vipPanel, vipTextPanel)
 	}
-
 	gotoPrevPage := func(_ *gocui.Gui, _ *gocui.View) error {
 		closeThisPage()
 		return showNext(c, dnsServersPanel)
@@ -2781,149 +2738,71 @@ func addVIPPanel(c *Console) error {
 		closeThisPage()
 		return showNext(c, tokenPanel)
 	}
-	gotoVipPanel := func(g *gocui.Gui, _ *gocui.View) error {
-		selected, err := askVipMethodV.GetData()
-		if err != nil {
-			return err
-		}
-		hwAddr, err := hwAddrV.GetData()
-		if err != nil {
-			return err
-		}
-		if selected == config.NetworkMethodDHCP {
-			spinner := NewSpinner(c.Gui, vipTextPanel, "Requesting IP through DHCP...")
-			spinner.Start()
-			go func(g *gocui.Gui) {
-				vip, err := getVipThroughDHCP(getManagementInterfaceName(c.config.ManagementInterface), hwAddr)
-				if err != nil {
-					spinner.Stop(true, err.Error())
-					g.Update(func(_ *gocui.Gui) error {
-						return showNext(c, askVipMethodPanel)
-					})
-					return
-				}
-				spinner.Stop(false, "")
-				c.config.Vip = vip.ipv4Addr
-				c.config.VipMode = selected
-				c.config.VipHwAddr = vip.hwAddr
-				g.Update(func(_ *gocui.Gui) error {
-					if err := hwAddrV.SetData(vip.hwAddr); err != nil {
-						return err
-					}
-					return vipV.SetData(vip.ipv4Addr)
-				})
-			}(c.Gui)
-		} else {
-			vipTextV.SetContent("")
-			g.Update(func(_ *gocui.Gui) error {
-				return vipV.SetData("")
-			})
-			c.config.VipMode = config.NetworkMethodStatic
-		}
-
-		return showNext(c, vipPanel)
-	}
 	gotoVerifyIP := func(g *gocui.Gui, v *gocui.View) error {
 		vip, err := vipV.GetData()
 		if err != nil {
 			return err
 		}
+		if err := validateStaticVIPAddress(vip, mgmtNetwork.IP, mgmtNetwork.SubnetMask); err != nil {
+			vipTextV.SetContent(err.Error())
+			return nil
+		}
 
-		if c.config.VipMode == config.NetworkMethodDHCP {
-			if vip != c.config.Vip {
-				vipTextV.SetContent("Forbid to modify the VIP obtained through DHCP")
-				return nil
+		vipTextV.SetContent("")
+		spinner := NewSpinner(c.Gui, vipTextPanel, "Checking VIP availability...")
+		spinner.Start()
+		go func(g *gocui.Gui) {
+			mac, probeErr := probeIPv4NeighborMAC(
+				getManagementInterfaceName(c.config.ManagementInterface),
+				vip,
+				vipNeighborProbeTimeout,
+			)
+			if probeErr != nil {
+				spinner.Stop(true, fmt.Sprintf("Unable to verify VIP availability: %v", probeErr))
+				g.Update(func(_ *gocui.Gui) error {
+					return showNext(c, vipPanel)
+				})
+				return
 			}
-			return gotoNextPage(g, v)
-		}
+			if len(mac) != 0 {
+				spinner.Stop(true, fmt.Sprintf("VIP %s is already in use by MAC %s", vip, mac.String()))
+				g.Update(func(_ *gocui.Gui) error {
+					return showNext(c, vipPanel)
+				})
+				return
+			}
 
-		// verify static IP
-		if net.ParseIP(vip) == nil {
-			vipTextV.SetContent(fmt.Sprintf("Invalid VIP: %s", vip))
-			return nil
-		}
-
-		if vip != "" && vip == mgmtNetwork.IP {
-			vipTextV.SetContent("VIP must not be the same as management NIC's IP")
-			return nil
-		}
-
-		c.config.Vip = vip
-		c.config.VipHwAddr = ""
-		// gotoVipPanel is only called in DHCP mode, it is still empty in static mode
-		if c.config.VipMode == "" {
+			spinner.Stop(false, "")
+			c.config.Vip = vip
 			c.config.VipMode = config.NetworkMethodStatic
-		}
-		return gotoNextPage(g, v)
+			c.config.VipHwAddr = ""
+			g.Update(func(_ *gocui.Gui) error {
+				return gotoNextPage(g, v)
+			})
+		}(c.Gui)
+		return nil
 	}
-	gotoAskVipMethodPanel := func(_ *gocui.Gui, _ *gocui.View) error {
-		return showNext(c, askVipMethodPanel)
-	}
-	confirmAskVipMethod := func(_ *gocui.Gui, _ *gocui.View) error {
-		method, err := askVipMethodV.GetData()
-		if err != nil {
-			return err
-		}
-		if method == config.NetworkMethodDHCP {
-			hwAddrNoteV.SetContent("Note: If DHCP MAC/IP address binding is configured on the DHCP server, enter the MAC address to fetch the static VIP. Otherwise, leave it blank.")
-			return showNext(c, vipPanel, vipHwAddrNotePanel, vipHwAddrPanel)
-		}
 
-		c.CloseElement(vipHwAddrPanel)
-		c.CloseElement(vipHwAddrNotePanel)
-
-		return showNext(c, vipPanel)
-	}
-	gotoVipParentPanel := func(_ *gocui.Gui, _ *gocui.View) error {
-		method, err := askVipMethodV.GetData()
-		if err != nil {
-			return err
-		}
-		if method == config.NetworkMethodDHCP {
-			if err := showNext(c, vipHwAddrPanel); err != nil {
-				return err
-			}
-			return hwAddrV.SetData(c.config.VipHwAddr)
-		}
-		return showNext(c, askVipMethodPanel)
-	}
-	askVipMethodV.KeyBindings = map[gocui.Key]func(*gocui.Gui, *gocui.View) error{
-		gocui.KeyArrowDown: confirmAskVipMethod,
-		gocui.KeyEnter:     confirmAskVipMethod,
-		gocui.KeyEsc:       gotoPrevPage,
-	}
-	hwAddrV.KeyBindings = map[gocui.Key]func(*gocui.Gui, *gocui.View) error{
-		gocui.KeyArrowUp:   gotoAskVipMethodPanel,
-		gocui.KeyArrowDown: gotoVipPanel,
-		gocui.KeyEnter:     gotoVipPanel,
-		gocui.KeyEsc:       gotoPrevPage,
-	}
 	vipV.KeyBindings = map[gocui.Key]func(*gocui.Gui, *gocui.View) error{
-		gocui.KeyArrowUp:   gotoVipParentPanel,
+		gocui.KeyArrowUp:   gotoPrevPage,
 		gocui.KeyArrowDown: gotoVerifyIP,
 		gocui.KeyEnter:     gotoVerifyIP,
 		gocui.KeyEsc:       gotoPrevPage,
 	}
-
-	askVipMethodV.PreShow = func() error {
+	vipV.PreShow = func() error {
 		c.Gui.Cursor = true
+		c.config.VipMode = config.NetworkMethodStatic
+		c.config.VipHwAddr = ""
+		vipV.Value = c.config.Vip
 		vipTextV.SetContent("")
+		if err := c.setContentByName(notePanel, "VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster. Use an unused IP in the same subnet as the management nodes. The VIP enables high availability and failover so the UI/API remains reachable if a node fails."); err != nil {
+			return err
+		}
 		return c.setContentByName(titlePanel, vipTitle)
 	}
 
-	setLocation(askVipMethodV, 3)
-	c.AddElement(askVipMethodPanel, askVipMethodV)
-
-	setLocation(hwAddrV, 3)
-	c.AddElement(vipHwAddrPanel, hwAddrV)
-
 	setLocation(vipV, 3)
 	c.AddElement(vipPanel, vipV)
-
-	hwAddrNoteV.Focus = false
-	hwAddrNoteV.Wrap = true
-	setLocation(hwAddrNoteV, 3)
-	c.AddElement(vipHwAddrNotePanel, hwAddrNoteV)
 
 	vipTextV.FgColor = gocui.ColorRed
 	vipTextV.Focus = false
@@ -3087,7 +2966,7 @@ func addDNSServersPanel(c *Console) error {
 			return err
 		}
 		if c.config.Install.Mode == config.ModeCreate {
-			return showNext(c, vipTextPanel, askVipMethodPanel)
+			return showNext(c, interactiveVIPPanels()...)
 		}
 		return showNext(c, serverURLPanel)
 	}
@@ -3133,7 +3012,8 @@ func addDNSServersPanel(c *Console) error {
 				if dnsServers != "" {
 					// check input syntax
 					dnsServerList := strings.Split(dnsServers, ",")
-					if err = checkIPList(dnsServerList); err != nil {
+					dnsServerList, err = normalizeStaticDNSList(dnsServerList)
+					if err != nil {
 						gotoSpinnerErrorPage(g, spinner, err.Error())
 						return
 					}
