@@ -59,6 +59,11 @@ jobs:
           else
             python3 scripts/layersentry-transform.py
           fi
+
+          # Apply the current LayerSentry interactive-flow policy idempotently.
+          # This keeps SSH and remote-config backend support while hiding those
+          # two optional screens from the manual installer.
+          python3 scripts/layersentry-ui-flow-update.py
       - name: Suppress network HTTP ISO artifact
         run: |
           python3 - <<'PY'
@@ -75,6 +80,31 @@ jobs:
               text = text.replace(anchor, replacement, 1)
               path.write_text(text)
           PY
+      - name: Validate LayerSentry interactive-flow policy
+        run: |
+          set -euxo pipefail
+          grep -F 'NTPServers: "time.google.com",' pkg/console/install_panels.go
+          grep -F 'VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster.' pkg/console/install_panels.go
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("pkg/console/install_panels.go").read_text()
+          proxy_start = text.index("func addProxyPanel")
+          cloud_start = text.index("func addCloudInitPanel")
+          proxy_block = text[proxy_start:cloud_start]
+          if "showNext(c, sshKeyPanel)" in proxy_block:
+              raise SystemExit("SSH screen is still reachable from the interactive proxy page")
+          if "showNext(c, confirmInstallPanel)" not in proxy_block:
+              raise SystemExit("interactive proxy page does not advance directly to confirmation")
+
+          confirm_start = text.index("func addConfirmInstallPanel")
+          confirm_end = text.index("func addConfirmUpgradePanel")
+          confirm_block = text[confirm_start:confirm_end]
+          if "showNext(c, cloudInitPanel)" in confirm_block:
+              raise SystemExit("remote LayerSentry config screen is still reachable from confirmation")
+          if "showNext(c, proxyPanel)" not in confirm_block:
+              raise SystemExit("confirmation page does not return to the visible proxy page")
+          PY
       - name: Format and validate source
         run: |
           gofmt -w pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go pkg/console/layersentry.go pkg/console/layersentry_test.go pkg/version/product.go
@@ -88,7 +118,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go scripts/package-harvester-os scripts/layersentry-transform.py
+          git add pkg/console/install_panels.go pkg/console/dashboard_panels.go pkg/console/constant.go scripts/package-harvester-os scripts/layersentry-transform.py scripts/layersentry-ui-flow-update.py
           if git diff --cached --quiet; then
             echo "No generated source changes to commit"
             exit 0
