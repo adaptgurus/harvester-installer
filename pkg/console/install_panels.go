@@ -53,7 +53,7 @@ const (
 var (
 	once          sync.Once
 	userInputData = UserInputData{
-		NTPServers: "0.suse.pool.ntp.org",
+		NTPServers: "time.google.com",
 	}
 	mgmtNetwork = config.Network{
 		DefaultRoute: true,
@@ -2300,7 +2300,7 @@ func addProxyPanel(c *Console) error {
 			if err = noteV.Close(); err != nil {
 				return err
 			}
-			return showNext(c, sshKeyPanel)
+			return showNext(c, confirmInstallPanel)
 		},
 		gocui.KeyEsc: func(_ *gocui.Gui, _ *gocui.View) error {
 			if err := proxyV.Close(); err != nil {
@@ -2473,7 +2473,7 @@ func addConfirmInstallPanel(c *Console) error {
 			if installModeOnly {
 				return showDiskPage(c)
 			}
-			return showNext(c, cloudInitPanel)
+			return showNext(c, proxyPanel)
 		},
 	}
 	c.AddElement(confirmInstallPanel, confirmV)
@@ -2795,6 +2795,9 @@ func addVIPPanel(c *Console) error {
 		c.config.VipHwAddr = ""
 		vipV.Value = c.config.Vip
 		vipTextV.SetContent("")
+		if err := c.setContentByName(notePanel, "VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster. Use an unused IP in the same subnet as the management nodes. The VIP enables high availability and failover so the UI/API remains reachable if a node fails."); err != nil {
+			return err
+		}
 		return c.setContentByName(titlePanel, vipTitle)
 	}
 
