@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      ISO_RUN_ID: '33352982632'
+      ISO_RUN_ID: '33370121624'
       ISO_ARTIFACT_NAME: layersentry-v1.0-amd64-offline-iso
     steps:
       - name: Install QEMU and OVMF
@@ -33,7 +33,7 @@ jobs:
           name: layersentry-v1.0-amd64-offline-iso
           path: /tmp/layersentry-artifact
           repository: adaptgurus/harvester-installer
-          run-id: 33352982632
+          run-id: 33370121624
           github-token: ${{ github.token }}
 
       - name: Verify checksum and locate ISO
