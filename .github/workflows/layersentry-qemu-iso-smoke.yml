@@ -1,0 +1,129 @@
+name: LayerSentry QEMU ISO boot smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/layersentry-installer-v1.0
+    paths:
+      - .github/workflows/layersentry-qemu-iso-smoke.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qemu-boot-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ISO_RUN_ID: '33352982632'
+      ISO_ARTIFACT_NAME: layersentry-v1.0-amd64-offline-iso
+    steps:
+      - name: Install QEMU and OVMF
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 ovmf
+          qemu-system-x86_64 --version
+
+      - name: Download verified LayerSentry ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: layersentry-v1.0-amd64-offline-iso
+          path: /tmp/layersentry-artifact
+          repository: adaptgurus/harvester-installer
+          run-id: 33352982632
+          github-token: ${{ github.token }}
+
+      - name: Verify checksum and locate ISO
+        id: iso
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ISO="$(find /tmp/layersentry-artifact -type f -name 'layersentry-v1.0-amd64.iso' -print -quit)"
+          SUM="$(find /tmp/layersentry-artifact -type f -name 'layersentry-v1.0-amd64.iso.sha512' -print -quit)"
+          test -n "$ISO" && test -f "$ISO"
+          test -n "$SUM" && test -f "$SUM"
+          cd "$(dirname "$ISO")"
+          sha512sum -c "$(basename "$SUM")"
+          ls -lh "$ISO" "$SUM"
+          echo "iso=$ISO" >> "$GITHUB_OUTPUT"
+
+      - name: BIOS boot smoke and framebuffer capture
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ISO='${{ steps.iso.outputs.iso }}'
+          mkdir -p /tmp/evidence/bios
+          rm -f /tmp/qemu-bios-mon.sock
+          qemu-system-x86_64 \
+            -machine pc,accel=tcg \
+            -cpu max \
+            -m 4096 -smp 2 \
+            -boot order=d,menu=on \
+            -cdrom "$ISO" \
+            -no-reboot \
+            -display none \
+            -serial file:/tmp/evidence/bios/serial.log \
+            -monitor unix:/tmp/qemu-bios-mon.sock,server=on,wait=off \
+            >/tmp/evidence/bios/qemu.log 2>&1 &
+          QPID=$!
+          echo "$QPID" >/tmp/evidence/bios/qemu.pid
+          for i in $(seq 1 30); do test -S /tmp/qemu-bios-mon.sock && break; sleep 1; done
+          test -S /tmp/qemu-bios-mon.sock
+          sleep 20
+          printf 'screendump /tmp/evidence/bios/boot-20s.ppm\n' | socat - UNIX-CONNECT:/tmp/qemu-bios-mon.sock
+          sleep 25
+          printf 'screendump /tmp/evidence/bios/boot-45s.ppm\ninfo status\ninfo block\n' | socat - UNIX-CONNECT:/tmp/qemu-bios-mon.sock | tee /tmp/evidence/bios/monitor.txt
+          test -s /tmp/evidence/bios/boot-20s.ppm
+          test -s /tmp/evidence/bios/boot-45s.ppm
+          kill "$QPID" || true
+          wait "$QPID" || true
+
+      - name: UEFI boot smoke and framebuffer capture
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ISO='${{ steps.iso.outputs.iso }}'
+          mkdir -p /tmp/evidence/uefi
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE.fd' -o -name 'OVMF_CODE_4M.fd' \) -print -quit)"
+          OVMF_VARS="$(find /usr/share -type f \( -name 'OVMF_VARS.fd' -o -name 'OVMF_VARS_4M.fd' \) -print -quit)"
+          test -n "$OVMF_CODE" && test -f "$OVMF_CODE"
+          test -n "$OVMF_VARS" && test -f "$OVMF_VARS"
+          cp "$OVMF_VARS" /tmp/OVMF_VARS.fd
+          rm -f /tmp/qemu-uefi-mon.sock
+          qemu-system-x86_64 \
+            -machine q35,accel=tcg \
+            -cpu max \
+            -m 4096 -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
+            -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd \
+            -boot order=d,menu=on \
+            -cdrom "$ISO" \
+            -no-reboot \
+            -display none \
+            -serial file:/tmp/evidence/uefi/serial.log \
+            -monitor unix:/tmp/qemu-uefi-mon.sock,server=on,wait=off \
+            >/tmp/evidence/uefi/qemu.log 2>&1 &
+          QPID=$!
+          echo "$QPID" >/tmp/evidence/uefi/qemu.pid
+          for i in $(seq 1 30); do test -S /tmp/qemu-uefi-mon.sock && break; sleep 1; done
+          test -S /tmp/qemu-uefi-mon.sock
+          sleep 20
+          printf 'screendump /tmp/evidence/uefi/boot-20s.ppm\n' | socat - UNIX-CONNECT:/tmp/qemu-uefi-mon.sock
+          sleep 25
+          printf 'screendump /tmp/evidence/uefi/boot-45s.ppm\ninfo status\ninfo block\n' | socat - UNIX-CONNECT:/tmp/qemu-uefi-mon.sock | tee /tmp/evidence/uefi/monitor.txt
+          test -s /tmp/evidence/uefi/boot-20s.ppm
+          test -s /tmp/evidence/uefi/boot-45s.ppm
+          kill "$QPID" || true
+          wait "$QPID" || true
+
+      - name: Upload boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-qemu-boot-evidence
+          path: /tmp/evidence
+          if-no-files-found: warn
+          retention-days: 7
