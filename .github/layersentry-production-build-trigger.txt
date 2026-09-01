@@ -1,0 +1,7 @@
+LayerSentry production ISO build trigger
+Date: 2026-09-01
+Product: LayerSentry 1.0
+Harvester base: v1.8.2
+Validated full-offline source baseline: 49e533b1afbaaa08f0611090a4c09f2a6c6098ed
+Build policy: full offline ISO only; no net-install ISO
+NTP policy: editable installer field; connected default may be replaced by customer-approved/local NTP
