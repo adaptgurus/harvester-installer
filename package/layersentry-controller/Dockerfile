@@ -1,5 +1,9 @@
 FROM scratch
 
+# BuildKit consumes SOURCE_DATE_EPOCH as a predefined build argument to
+# normalize image configuration, history, and layer timestamps. The launcher
+# passes the exact controller source-commit epoch.
+ARG SOURCE_DATE_EPOCH
 ARG CONTROLLER_VERSION
 ARG SOURCE_COMMIT
 ARG BUILD_EPOCH
