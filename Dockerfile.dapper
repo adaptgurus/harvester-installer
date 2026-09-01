@@ -26,7 +26,7 @@ LABEL org.opencontainers.image.source="https://github.com/adaptgurus/harvester-i
 # before this image can be used by the production ISO workflow.
 #
 # SLE 15 retains Python 3.6 as /usr/bin/python3. LayerSentry provenance scripts
-# require Python 3.11, so the builder installs the parallel python311 package
+# require Python 3.11, so the builder installs the parallel Python 3.11 package
 # and makes it the first python/python3 resolved through /usr/local/bin.
 RUN test "${ARCH}" = "amd64" && \
     zypper -n rm container-suseconnect && \
