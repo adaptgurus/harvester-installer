@@ -11,15 +11,12 @@ fail() {
   exit 1
 }
 
-for command in docker go git python3 sha256sum stat cmp; do
+for command in docker go git python3 sha256sum stat cmp touch tar; do
   command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
 done
 
 build_binary() {
-  local source_file=$1
-  local output=$2
-  local source_commit=$3
-  local build_epoch=$4
+  local source_file=$1 output=$2 source_commit=$3 build_epoch=$4
   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build \
       -trimpath \
@@ -27,13 +24,12 @@ build_binary() {
       -ldflags "-s -w -buildid= -X main.version=${CONTROLLER_VERSION} -X main.sourceCommit=${source_commit} -X main.buildEpoch=${build_epoch}" \
       -o "$output" \
       "$source_file"
+  chmod 0555 "$output"
+  touch -d "@${build_epoch}" "$output"
 }
 
 build_image() {
-  local context=$1
-  local tag=$2
-  local source_commit=$3
-  local build_epoch=$4
+  local context=$1 tag=$2 source_commit=$3 build_epoch=$4
   SOURCE_DATE_EPOCH="$build_epoch" \
     docker buildx build \
       --load \
@@ -51,8 +47,7 @@ build_image() {
 }
 
 canonical_inspect() {
-  local image=$1
-  local output=$2
+  local image=$1 output=$2
   docker image inspect "$image" > "$output.raw"
   python3 - "$output.raw" "$output" <<'PY'
 import json
@@ -84,13 +79,10 @@ PY
 }
 
 validate_local_image() {
-  local image=$1
-  local source_commit=$2
-  local build_epoch=$3
+  local image=$1 source_commit=$2 build_epoch=$3 output=$4
   docker run --rm --network none --read-only --cap-drop ALL \
-    --security-opt no-new-privileges "$image" --self-test \
-    > /tmp/layersentry-controller-self-test.json
-  python3 - /tmp/layersentry-controller-self-test.json "$source_commit" "$build_epoch" <<'PY'
+    --security-opt no-new-privileges "$image" --self-test > "$output"
+  python3 - "$output" "$source_commit" "$build_epoch" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -107,124 +99,12 @@ expected = {
 }
 if value != expected:
     raise SystemExit(f"unexpected controller self-test output: {value!r}")
-path.unlink()
 PY
 }
 
-candidate_mode() {
-  [[ $# -eq 4 ]] || fail "usage: $0 --candidate OUTPUT_DIR SOURCE_COMMIT SOURCE_ALIAS VERSION_ALIAS"
-  local output_dir=$1
-  local source_commit=$2
-  local source_alias=$3
-  local version_alias=$4
-  [[ $source_commit =~ ^[0-9a-f]{40}$ ]] || fail "source commit must be exactly 40 lowercase hex characters"
-  [[ $source_alias == "${CONTROLLER_REPOSITORY}:source-${source_commit}" ]] \
-    || fail "source alias is not bound to the exact source commit"
-  [[ $version_alias == "${CONTROLLER_REPOSITORY}:${CONTROLLER_VERSION}" ]] \
-    || fail "version alias is not ${CONTROLLER_REPOSITORY}:${CONTROLLER_VERSION}"
-  [[ $(git -C "$TOP_DIR" rev-parse HEAD) == "$source_commit" ]] \
-    || fail "candidate build must run from the exact source commit"
-
-  local build_epoch
-  build_epoch=$(git -C "$TOP_DIR" show -s --format=%ct "$source_commit")
-  [[ $build_epoch =~ ^[1-9][0-9]*$ ]] || fail "could not derive deterministic source commit epoch"
-
-  output_dir=$(mkdir -p "$output_dir" && cd "$output_dir" && pwd)
-  rm -rf "$output_dir"/*
-  local work="$output_dir/work"
-  mkdir -p "$work/pass1" "$work/pass2" "$work/context/bin"
-
-  (
-    cd "$TOP_DIR"
-    go test -count=1 ./cmd/layersentry-controller
-  )
-  build_binary "$TOP_DIR/cmd/layersentry-controller/main.go" \
-    "$work/pass1/layersentry-controller" "$source_commit" "$build_epoch"
-  build_binary "$TOP_DIR/cmd/layersentry-controller/main.go" \
-    "$work/pass2/layersentry-controller" "$source_commit" "$build_epoch"
-  cmp "$work/pass1/layersentry-controller" "$work/pass2/layersentry-controller"
-  install -m 0555 "$work/pass1/layersentry-controller" \
-    "$output_dir/layersentry-controller-linux-amd64"
-  install -m 0555 "$work/pass1/layersentry-controller" \
-    "$work/context/bin/layersentry-controller"
-  cp "$TOP_DIR/package/layersentry-controller/Dockerfile" "$work/context/Dockerfile"
-
-  local local1="layersentry/controller-candidate:${source_commit:0:12}-pass1"
-  local local2="layersentry/controller-candidate:${source_commit:0:12}-pass2"
-  build_image "$work/context" "$local1" "$source_commit" "$build_epoch"
-  build_image "$work/context" "$local2" "$source_commit" "$build_epoch"
-  canonical_inspect "$local1" "$work/pass1/image-inspect.json"
-  canonical_inspect "$local2" "$work/pass2/image-inspect.json"
-  cmp "$work/pass1/image-inspect.json" "$work/pass2/image-inspect.json"
-  cp "$work/pass1/image-inspect.json" "$output_dir/image-inspect.json"
-  validate_local_image "$local1" "$source_commit" "$build_epoch"
-  validate_local_image "$local2" "$source_commit" "$build_epoch"
-
-  docker tag "$local1" "$source_alias"
-  docker tag "$local1" "$version_alias"
-  local source_push version_push source_digest version_digest
-  source_push=$(docker push "$source_alias")
-  version_push=$(docker push "$version_alias")
-  source_digest=$(printf '%s\n' "$source_push" \
-    | grep -Eo 'digest: sha256:[0-9a-f]{64}' \
-    | tail -n 1 \
-    | awk '{print $2}')
-  version_digest=$(printf '%s\n' "$version_push" \
-    | grep -Eo 'digest: sha256:[0-9a-f]{64}' \
-    | tail -n 1 \
-    | awk '{print $2}')
-  [[ $source_digest =~ ^sha256:[0-9a-f]{64}$ ]] || fail "could not determine pushed source-alias digest"
-  [[ $version_digest == "$source_digest" ]] || fail "source and version aliases resolved to different manifests"
-  local controller_ref="${CONTROLLER_REPOSITORY}@${source_digest}"
-  docker pull --platform linux/amd64 "$controller_ref" >/dev/null
-
-  SYFT_CHECK_FOR_APP_UPDATE=false syft "$controller_ref" -o spdx-json \
-    > "$output_dir/controller-sbom.spdx.json"
-  python3 - "$output_dir/controller-sbom.spdx.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-if not path.is_file() or path.stat().st_size == 0:
-    raise SystemExit("controller SBOM is empty")
-document = json.loads(path.read_text(encoding="utf-8"))
-if not str(document.get("spdxVersion", "")).startswith("SPDX-"):
-    raise SystemExit("controller SBOM has no valid SPDX version")
-if not document.get("documentNamespace"):
-    raise SystemExit("controller SBOM has no document namespace")
-PY
-
-  (
-    cd "$TOP_DIR"
-    for path in \
-      go.mod \
-      cmd/layersentry-controller/main.go \
-      cmd/layersentry-controller/main_test.go \
-      package/layersentry-controller/Dockerfile \
-      package/layersentry-controller/README.md \
-      scripts/build-layersentry-controller \
-      scripts/default \
-      scripts/images/harvester-additional-images.txt \
-      scripts/provenance/review_controller_image.py \
-      scripts/provenance/verify_controller_binding.py \
-      tests/test_controller_image_lock.py \
-      .github/workflows/layersentry-v1.0-controller-lock.yml; do
-      [[ -f "$path" ]] || fail "required controller source input is missing: $path"
-      printf '%s\t%s\t%s\n' \
-        "$path" \
-        "$(stat -c '%s' "$path")" \
-        "$(sha256sum "$path" | awk '{print $1}')"
-    done
-  ) > "$output_dir/source-inputs.tsv"
-
-  python3 - \
-    "$output_dir" \
-    "$source_commit" \
-    "$build_epoch" \
-    "$controller_ref" \
-    "$source_alias" \
-    "$version_alias" <<'PY'
+write_candidate() {
+  local output_dir=$1 source_commit=$2 build_epoch=$3 controller_ref=$4 source_alias=$5 version_alias=$6
+  python3 - "$output_dir" "$source_commit" "$build_epoch" "$controller_ref" "$source_alias" "$version_alias" <<'PY'
 from __future__ import annotations
 
 import hashlib
@@ -341,13 +221,91 @@ status = f"""# LayerSentry controller image candidate
 """
 (output / "STATUS.md").write_text(status, encoding="utf-8")
 PY
+}
 
+candidate_mode() {
+  [[ $# -eq 4 ]] || fail "usage: $0 --candidate OUTPUT_DIR SOURCE_COMMIT SOURCE_ALIAS VERSION_ALIAS"
+  local output_dir=$1 source_commit=$2 source_alias=$3 version_alias=$4
+  [[ $source_commit =~ ^[0-9a-f]{40}$ ]] || fail "source commit must be exactly 40 lowercase hex characters"
+  [[ $source_alias == "${CONTROLLER_REPOSITORY}:source-${source_commit}" ]] || fail "source alias is not bound to the exact source commit"
+  [[ $version_alias == "${CONTROLLER_REPOSITORY}:${CONTROLLER_VERSION}" ]] || fail "version alias is unexpected"
+  [[ $(git -C "$TOP_DIR" rev-parse HEAD) == "$source_commit" ]] || fail "candidate build must run from the exact source commit"
+
+  local build_epoch work local1 local2 source_push version_push source_digest version_digest controller_ref
+  build_epoch=$(git -C "$TOP_DIR" show -s --format=%ct "$source_commit")
+  [[ $build_epoch =~ ^[1-9][0-9]*$ ]] || fail "could not derive deterministic source commit epoch"
+  output_dir=$(mkdir -p "$output_dir" && cd "$output_dir" && pwd)
+  rm -rf "$output_dir"/*
+  work="$output_dir/work"
+  mkdir -p "$work/pass1" "$work/pass2" "$work/context/bin"
+
+  (cd "$TOP_DIR" && go test -count=1 ./cmd/layersentry-controller)
+  build_binary "$TOP_DIR/cmd/layersentry-controller/main.go" "$work/pass1/layersentry-controller" "$source_commit" "$build_epoch"
+  build_binary "$TOP_DIR/cmd/layersentry-controller/main.go" "$work/pass2/layersentry-controller" "$source_commit" "$build_epoch"
+  cmp "$work/pass1/layersentry-controller" "$work/pass2/layersentry-controller"
+  install -p -m 0555 "$work/pass1/layersentry-controller" "$output_dir/layersentry-controller-linux-amd64"
+  install -p -m 0555 "$work/pass1/layersentry-controller" "$work/context/bin/layersentry-controller"
+  cp "$TOP_DIR/package/layersentry-controller/Dockerfile" "$work/context/Dockerfile"
+
+  local1="layersentry/controller-candidate:${source_commit:0:12}-pass1"
+  local2="layersentry/controller-candidate:${source_commit:0:12}-pass2"
+  build_image "$work/context" "$local1" "$source_commit" "$build_epoch"
+  build_image "$work/context" "$local2" "$source_commit" "$build_epoch"
+  canonical_inspect "$local1" "$work/pass1/image-inspect.json"
+  canonical_inspect "$local2" "$work/pass2/image-inspect.json"
+  cmp "$work/pass1/image-inspect.json" "$work/pass2/image-inspect.json"
+  cp "$work/pass1/image-inspect.json" "$output_dir/image-inspect.json"
+  validate_local_image "$local1" "$source_commit" "$build_epoch" "$work/pass1/self-test.json"
+  validate_local_image "$local2" "$source_commit" "$build_epoch" "$work/pass2/self-test.json"
+  cmp "$work/pass1/self-test.json" "$work/pass2/self-test.json"
+
+  docker tag "$local1" "$source_alias"
+  docker tag "$local1" "$version_alias"
+  source_push=$(docker push "$source_alias")
+  version_push=$(docker push "$version_alias")
+  source_digest=$(printf '%s\n' "$source_push" | grep -Eo 'digest: sha256:[0-9a-f]{64}' | tail -n 1 | awk '{print $2}')
+  version_digest=$(printf '%s\n' "$version_push" | grep -Eo 'digest: sha256:[0-9a-f]{64}' | tail -n 1 | awk '{print $2}')
+  [[ $source_digest =~ ^sha256:[0-9a-f]{64}$ ]] || fail "could not determine pushed source-alias digest"
+  [[ $version_digest == "$source_digest" ]] || fail "source and version aliases resolved to different manifests"
+  controller_ref="${CONTROLLER_REPOSITORY}@${source_digest}"
+  docker pull --platform linux/amd64 "$controller_ref" >/dev/null
+
+  SYFT_CHECK_FOR_APP_UPDATE=false syft "$controller_ref" -o spdx-json > "$output_dir/controller-sbom.spdx.json"
+  python3 - "$output_dir/controller-sbom.spdx.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+document = json.loads(path.read_text(encoding="utf-8"))
+if path.stat().st_size == 0 or not str(document.get("spdxVersion", "")).startswith("SPDX-") or not document.get("documentNamespace"):
+    raise SystemExit("controller SBOM is incomplete")
+PY
+
+  (
+    cd "$TOP_DIR"
+    for path in \
+      go.mod \
+      cmd/layersentry-controller/main.go \
+      cmd/layersentry-controller/main_test.go \
+      package/layersentry-controller/Dockerfile \
+      package/layersentry-controller/README.md \
+      scripts/build-layersentry-controller \
+      scripts/default \
+      scripts/images/harvester-additional-images.txt \
+      scripts/provenance/review_controller_image.py \
+      scripts/provenance/verify_controller_binding.py \
+      tests/test_controller_image_lock.py \
+      .github/workflows/layersentry-v1.0-controller-lock.yml; do
+      [[ -f "$path" ]] || fail "required controller source input is missing: $path"
+      printf '%s\t%s\t%s\n' "$path" "$(stat -c '%s' "$path")" "$(sha256sum "$path" | awk '{print $1}')"
+    done
+  ) > "$output_dir/source-inputs.tsv"
+
+  write_candidate "$output_dir" "$source_commit" "$build_epoch" "$controller_ref" "$source_alias" "$version_alias"
   rm -rf "$work"
   (
     cd "$output_dir"
-    find . -maxdepth 1 -type f ! -name evidence-files.sha256 -print0 \
-      | sort -z \
-      | xargs -0 sha256sum > evidence-files.sha256
+    find . -maxdepth 1 -type f ! -name evidence-files.sha256 -print0 | sort -z | xargs -0 sha256sum > evidence-files.sha256
     sha256sum -c evidence-files.sha256
   )
   echo "LAYERSENTRY CONTROLLER CANDIDATE: PASS"
@@ -358,9 +316,8 @@ PY
 from_lock_mode() {
   [[ $# -eq 0 ]] || fail "usage: $0 --from-lock"
   [[ -f "$LOCK_FILE" ]] || fail "provenance lock is missing: $LOCK_FILE"
-  local binding
+  local binding work source_commit controller_ref version_alias source_alias build_epoch binary_sha config_digest rootfs_csv local_tag
   binding=$(mktemp)
-  trap 'rm -f "$binding"' RETURN
   python3 - "$LOCK_FILE" "$TOP_DIR/scripts/build-layersentry-controller" > "$binding" <<'PY'
 import hashlib
 import json
@@ -368,46 +325,29 @@ import re
 import sys
 from pathlib import Path
 
-lock_path = Path(sys.argv[1])
+lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 script_path = Path(sys.argv[2])
-lock = json.loads(lock_path.read_text(encoding="utf-8"))
-sources = [
-    item for item in lock.get("source_locks", [])
-    if item.get("component") == "layersentry-controller"
-]
-images = [
-    item for item in lock.get("container_images", [])
-    if item.get("id") == "layersentry-controller"
-]
+sources = [item for item in lock.get("source_locks", []) if item.get("component") == "layersentry-controller"]
+images = [item for item in lock.get("container_images", []) if item.get("id") == "layersentry-controller"]
 reviewed = lock.get("reviewed_controller_image")
 if len(sources) != 1 or len(images) != 1 or not isinstance(reviewed, dict):
     raise SystemExit("controller source, image, or reviewed metadata is not completely locked")
-source = sources[0]
-image = images[0]
+source, image = sources[0], images[0]
 commit = str(source.get("commit", ""))
 if not re.fullmatch(r"[0-9a-f]{40}", commit):
     raise SystemExit("controller source commit is invalid")
-if source.get("repository") != "https://github.com/adaptgurus/harvester-installer.git":
-    raise SystemExit("controller source repository is unexpected")
-if source.get("version_label") != "v1.0.0":
-    raise SystemExit("controller source version is unexpected")
+if source.get("repository") != "https://github.com/adaptgurus/harvester-installer.git" or source.get("version_label") != "v1.0.0":
+    raise SystemExit("controller source repository or version is unexpected")
 ref = str(image.get("ref", ""))
 if not re.fullmatch(r"ghcr\.io/adaptgurus/layersentry-controller@sha256:[0-9a-f]{64}", ref):
     raise SystemExit("controller image is not an exact GHCR digest")
-aliases = image.get("aliases")
 version_alias = "ghcr.io/adaptgurus/layersentry-controller:v1.0.0"
 source_alias = f"ghcr.io/adaptgurus/layersentry-controller:source-{commit}"
-if aliases != [version_alias, source_alias]:
+if image.get("aliases") != [version_alias, source_alias]:
     raise SystemExit("controller aliases are not the reviewed version/source pair")
-source_inputs = {
-    item.get("path"): item for item in reviewed.get("source_inputs", [])
-    if isinstance(item, dict)
-}
+source_inputs = {item.get("path"): item for item in reviewed.get("source_inputs", []) if isinstance(item, dict)}
 script_lock = source_inputs.get("scripts/build-layersentry-controller")
-if not script_lock:
-    raise SystemExit("reviewed controller metadata does not bind the rebuild script")
-actual_script_sha = hashlib.sha256(script_path.read_bytes()).hexdigest()
-if script_lock.get("sha256") != actual_script_sha:
+if not script_lock or script_lock.get("sha256") != hashlib.sha256(script_path.read_bytes()).hexdigest():
     raise SystemExit("current controller rebuild script differs from reviewed source input")
 values = [
     commit,
@@ -419,65 +359,50 @@ values = [
     str(reviewed.get("image_config_digest", "")),
     ",".join(reviewed.get("rootfs_diff_ids", [])),
 ]
-for value in values:
-    if "\n" in value or "\r" in value:
-        raise SystemExit("controller binding contains a newline")
+if any("\n" in value or "\r" in value for value in values):
+    raise SystemExit("controller binding contains a newline")
 print("\n".join(values))
 PY
   mapfile -t values < "$binding"
+  rm -f "$binding"
   [[ ${#values[@]} -eq 8 ]] || fail "controller lock binding is incomplete"
-  local source_commit=${values[0]}
-  local controller_ref=${values[1]}
-  local version_alias=${values[2]}
-  local source_alias=${values[3]}
-  local build_epoch=${values[4]}
-  local binary_sha=${values[5]}
-  local config_digest=${values[6]}
-  local rootfs_csv=${values[7]}
-  [[ $(git -C "$TOP_DIR" merge-base --is-ancestor "$source_commit" HEAD; echo $?) -eq 0 ]] \
-    || fail "locked controller source commit is not an ancestor of the build source"
+  source_commit=${values[0]}
+  controller_ref=${values[1]}
+  version_alias=${values[2]}
+  source_alias=${values[3]}
+  build_epoch=${values[4]}
+  binary_sha=${values[5]}
+  config_digest=${values[6]}
+  rootfs_csv=${values[7]}
+  git -C "$TOP_DIR" merge-base --is-ancestor "$source_commit" HEAD || fail "locked controller source commit is not an ancestor of the build source"
 
-  local work
   work=$(mktemp -d "${RUNNER_TEMP:-/tmp}/layersentry-controller-rebuild.XXXXXX")
-  trap 'rm -rf "$work" "$binding"' RETURN
   mkdir -p "$work/source" "$work/context/bin"
-  git -C "$TOP_DIR" archive "$source_commit" \
-    go.mod \
-    cmd/layersentry-controller \
-    package/layersentry-controller \
-    | tar -x -C "$work/source"
-
-  (
-    cd "$work/source"
-    go test -count=1 ./cmd/layersentry-controller
-  )
-  build_binary "$work/source/cmd/layersentry-controller/main.go" \
-    "$work/context/bin/layersentry-controller" "$source_commit" "$build_epoch"
+  git -C "$TOP_DIR" archive "$source_commit" go.mod cmd/layersentry-controller package/layersentry-controller | tar -x -C "$work/source"
+  (cd "$work/source" && go test -count=1 ./cmd/layersentry-controller)
+  build_binary "$work/source/cmd/layersentry-controller/main.go" "$work/context/bin/layersentry-controller" "$source_commit" "$build_epoch"
   echo "$binary_sha  $work/context/bin/layersentry-controller" | sha256sum -c -
-  chmod 0555 "$work/context/bin/layersentry-controller"
   cp "$work/source/package/layersentry-controller/Dockerfile" "$work/context/Dockerfile"
 
-  local local_tag="layersentry/controller-locked:${source_commit:0:12}"
+  local_tag="layersentry/controller-locked:${source_commit:0:12}"
   build_image "$work/context" "$local_tag" "$source_commit" "$build_epoch"
-  validate_local_image "$local_tag" "$source_commit" "$build_epoch"
+  validate_local_image "$local_tag" "$source_commit" "$build_epoch" "$work/self-test.json"
   canonical_inspect "$local_tag" "$work/image-inspect.json"
   python3 - "$work/image-inspect.json" "$config_digest" "$rootfs_csv" <<'PY'
 import json
 import sys
 from pathlib import Path
-
 inspection = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 expected_config = "sha256:" + sys.argv[2]
 expected_layers = sys.argv[3].split(",") if sys.argv[3] else []
 if inspection.get("id") != expected_config:
-    raise SystemExit(
-        f"rebuilt controller config digest {inspection.get('id')!r} != {expected_config!r}"
-    )
+    raise SystemExit(f"rebuilt controller config digest {inspection.get('id')!r} != {expected_config!r}")
 if inspection.get("rootfs_layers") != expected_layers:
     raise SystemExit("rebuilt controller rootfs diff IDs differ from reviewed evidence")
 PY
   docker tag "$local_tag" "$version_alias"
   docker tag "$local_tag" "$source_alias"
+  rm -rf "$work"
   echo "LAYERSENTRY CONTROLLER LOCKED REBUILD: PASS"
   echo "locked_ref=$controller_ref"
   echo "local_runtime_alias=$version_alias"
