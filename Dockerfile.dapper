@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/golang:1.26
+FROM registry.suse.com/bci/golang@sha256:fa2dced84848f4e961e22f2b7d353d5df29fccba96c7b68c56b1bf495ac5dea1
 
 ARG http_proxy=$http_proxy
 ARG https_proxy=$https_proxy
@@ -10,59 +10,92 @@ ENV no_proxy=$no_proxy
 ARG HARVESTER_INSTALLER_OFFLINE_BUILD
 ENV HARVESTER_INSTALLER_OFFLINE_BUILD=$HARVESTER_INSTALLER_OFFLINE_BUILD
 
-ARG DAPPER_HOST_ARCH
-ENV ARCH $DAPPER_HOST_ARCH
+ARG DAPPER_HOST_ARCH=amd64
+ENV ARCH=$DAPPER_HOST_ARCH
 
-# mtools and dosfstools are requirements for luet-makeiso >= 0.4.0 to build hybrid ISO.
-RUN zypper -n rm container-suseconnect && \
-    zypper -n install git curl docker gzip tar wget zstd squashfs xorriso awk jq mtools dosfstools unzip rsync patch
+ARG LAYERSENTRY_BUILDER_SOURCE=UNSET
+LABEL org.opencontainers.image.source="https://github.com/adaptgurus/harvester-installer" \
+      org.opencontainers.image.revision="${LAYERSENTRY_BUILDER_SOURCE}" \
+      org.opencontainers.image.title="LayerSentry v1.0 full-offline builder" \
+      io.layersentry.release="v1.0" \
+      io.layersentry.embedded-platform="Harvester v1.8.2"
+
+# The release builder is intentionally amd64-only. Package repositories are
+# allowed only while constructing this image. The resulting OCI digest, full
+# RPM inventory and every release-critical binary are reviewed and locked
+# before this image can be used by the production ISO workflow.
+RUN test "${ARCH}" = "amd64" && \
+    zypper -n rm container-suseconnect && \
+    zypper -n install --no-recommends \
+      git curl docker gzip tar wget zstd squashfs xorriso awk jq \
+      mtools dosfstools unzip rsync patch python3 coreutils findutils \
+      ca-certificates iptables iproute2 && \
+    zypper clean --all
 
 # yq
-# renovate: datasource=github-release-attachments depName=mikefarah/yq
 ARG YQ_VERSION=v4.52.5
-# renovate: datasource=github-release-attachments depName=mikefarah/yq digestVersion=v4.52.5
-ARG YQ_SUM_amd64=75d893a0d5940d1019cb7cdc60001d9e876623852c31cfc6267047bc31149fa9
-# renovate: datasource=github-release-attachments depName=mikefarah/yq digestVersion=v4.52.5
-ARG YQ_SUM_arm64=90fa510c50ee8ca75544dbfffed10c88ed59b36834df35916520cddc623d9aaa
+ARG YQ_SHA256=75d893a0d5940d1019cb7cdc60001d9e876623852c31cfc6267047bc31149fa9
+RUN curl --fail --location --silent --show-error \
+      "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
+      -o /usr/local/bin/yq && \
+    echo "${YQ_SHA256}  /usr/local/bin/yq" | sha256sum -c - && \
+    chmod 0755 /usr/local/bin/yq
 
-ENV YQ_SUM="YQ_SUM_${ARCH}"
-RUN curl -sfL https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH} -o /usr/bin/yq && echo "${!YQ_SUM}" /usr/bin/yq | sha256sum -c - && chmod +x /usr/bin/yq
-
-
-RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
-
-# only needed for raw image generation. currently skipped for arm builds
-RUN if [ "${ARCH}" == "amd64" ]; then \
-    zypper addrepo http://download.opensuse.org/distribution/leap/15.4/repo/oss/ oss && \
-    zypper --gpg-auto-import-keys refresh && \
-    zypper in -y qemu-x86 qemu-tools; \
-    fi
-
-# set up helm
+# Helm
 ARG HELM_VERSION=v3.20.0
-ARG HELM_SUM_amd64=dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286
-ARG HELM_SUM_arm64=bfb14953295d5324d47ab55f3dfba6da28d46c848978c8fbf412d4271bdc29f1
-ARG HELM_SUM="HELM_SUM_${ARCH}"
-RUN mkdir /usr/tmp && cd /usr/tmp && \
-    curl -O https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz && \
-    echo "${!HELM_SUM}" helm-${HELM_VERSION}-linux-${ARCH}.tar.gz | sha256sum -c - && \
-    tar xvzf helm-${HELM_VERSION}-linux-${ARCH}.tar.gz --strip-components=1 && \
-    mv helm /usr/bin/helm
+ARG HELM_SHA256=dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286
+RUN mkdir -p /usr/tmp && \
+    curl --fail --location --silent --show-error \
+      "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+      -o /usr/tmp/helm.tar.gz && \
+    echo "${HELM_SHA256}  /usr/tmp/helm.tar.gz" | sha256sum -c - && \
+    tar -xzf /usr/tmp/helm.tar.gz -C /usr/tmp && \
+    install -m 0755 /usr/tmp/linux-amd64/helm /usr/local/bin/helm && \
+    rm -rf /usr/tmp/helm.tar.gz /usr/tmp/linux-amd64
+
+# Docker Buildx. The plugin is checksum-bound and becomes part of the immutable
+# builder image rather than inheriting an arbitrary host-runner plugin.
+ARG BUILDX_VERSION=v0.36.1
+ARG BUILDX_SHA256=48af8a397ebd60178778bf63611dbcebe5f5e7a9be90eb9147b24b9587455778
+RUN install -d -m 0755 /usr/local/lib/docker/cli-plugins && \
+    curl --fail --location --silent --show-error \
+      "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64" \
+      -o /usr/local/lib/docker/cli-plugins/docker-buildx && \
+    echo "${BUILDX_SHA256}  /usr/local/lib/docker/cli-plugins/docker-buildx" | sha256sum -c - && \
+    chmod 0755 /usr/local/lib/docker/cli-plugins/docker-buildx
+
+# Syft is staged in the same immutable builder image and remains independently
+# verified against the existing LayerSentry Syft lock before release evidence.
+ARG SYFT_VERSION=v1.51.1
+ARG SYFT_SHA256=8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3
+RUN curl --fail --location --silent --show-error \
+      "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_1.51.1_linux_amd64.tar.gz" \
+      -o /usr/tmp/syft.tar.gz && \
+    echo "${SYFT_SHA256}  /usr/tmp/syft.tar.gz" | sha256sum -c - && \
+    tar -xzf /usr/tmp/syft.tar.gz -C /usr/local/bin syft && \
+    chmod 0755 /usr/local/bin/syft && \
+    rm -f /usr/tmp/syft.tar.gz
+
+COPY scripts/provenance/locked_builder_entrypoint.sh \
+  /usr/local/bin/layersentry-builder-entrypoint
+RUN chmod 0755 /usr/local/bin/layersentry-builder-entrypoint
 
 ARG LOCAL_HARVESTER_SRC
 ENV HARVESTER_SRC_MOUNT="${LOCAL_HARVESTER_SRC:+-v $LOCAL_HARVESTER_SRC:/go/src/github.com/harvester/harvester}"
 ARG LOCAL_ADDONS_SRC
 ENV ADDONS_SRC_MOUNT="${LOCAL_ADDONS_SRC:+-v $LOCAL_ADDONS_SRC:/go/src/github.com/harvester/addons}"
 
-# You cloud defined your own rke2 url by setup `RKE2_IMAGE_REPO`
-ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_BRANCH CROSS RKE2_IMAGE_REPO USE_LOCAL_IMAGES BUILD_QCOW DRONE_BUILD_EVENT REMOTE_DEBUG
-ENV DAPPER_SOURCE /go/src/github.com/harvester/harvester-installer/
-ENV DAPPER_OUTPUT ./bin ./dist
-ENV DAPPER_DOCKER_SOCKET true
-ENV DAPPER_RUN_ARGS "-v /run/containerd/containerd.sock:/run/containerd/containerd.sock -v harvester-installer-go:/root/go -v harvester-installer-cache:/root/.cache ${HARVESTER_SRC_MOUNT} ${ADDONS_SRC_MOUNT} --privileged"
+# Dapper remains usable for development, but it no longer injects either the
+# host Docker socket or the host containerd socket into the builder. The image
+# entrypoint starts the same internal daemon used by the production launcher.
+ENV DAPPER_ENV="REPO TAG DRONE_TAG DRONE_BRANCH CROSS RKE2_IMAGE_REPO USE_LOCAL_IMAGES BUILD_QCOW DRONE_BUILD_EVENT REMOTE_DEBUG"
+ENV DAPPER_SOURCE=/go/src/github.com/harvester/harvester-installer/
+ENV DAPPER_OUTPUT="./bin ./dist"
+ENV DAPPER_RUN_ARGS="-v harvester-installer-go:/root/go -v harvester-installer-cache:/root/.cache ${HARVESTER_SRC_MOUNT} ${ADDONS_SRC_MOUNT} --privileged"
+ENV DOCKER_BUILDKIT=1
+ENV HOME=/root
 
-ENV HOME ${DAPPER_SOURCE}
-WORKDIR ${DAPPER_SOURCE}
+WORKDIR /go/src/github.com/harvester/harvester-installer/
 
-ENTRYPOINT ["./scripts/entry"]
-CMD ["ci"]
+ENTRYPOINT ["/usr/local/bin/layersentry-builder-entrypoint"]
+CMD ["default"]
