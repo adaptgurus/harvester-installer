@@ -1,0 +1,71 @@
+name: LayerSentry Hyper-V qualification harness validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/layersentry-v1.8.2-production
+    paths:
+      - scripts/prepare-production-hyperv-install-qualification.ps1
+      - .github/workflows/layersentry-hyperv-harness-validation.yml
+      - docs/qualification/hyperv-install-qualification.md
+
+permissions:
+  contents: read
+
+jobs:
+  validate-hyperv-harness:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout harness source
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell without executing Hyper-V operations
+        shell: pwsh
+        run: |
+          $path = "scripts/prepare-production-hyperv-install-qualification.ps1"
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $path),
+            [ref]$tokens,
+            [ref]$errors
+          )
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+          Write-Host "PowerShell parser accepted $path"
+
+      - name: Enforce immutable candidate and qualification boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          script=scripts/prepare-production-hyperv-install-qualification.ps1
+
+          grep -F 'installerCommit      = "a104eab8cc5eca42b7ef002fc96561a21be3f163"' "$script"
+          grep -F 'buildWorkflowRunId   = "33479776571"' "$script"
+          grep -F 'artifactId           = "9790788698"' "$script"
+          grep -F 'isoBytes             = [int64]8180137984' "$script"
+          grep -F 'isoSha512            = "7f1cd57c363f3b6b592fcbfb90d810c8f12f881e14e097fe17b2833250ee9e57a9831e4398147bd612bc7e3a36a4c45751019473e60eeaa263e5660c996feb81"' "$script"
+
+          grep -F '[string]$ApprovedNtpServer = "time.google.com"' "$script"
+          grep -F 'Set-VMProcessor `' "$script"
+          grep -F -- '-ExposeVirtualizationExtensions $true' "$script"
+          grep -F 'Set-VMNetworkAdapter `' "$script"
+          grep -F -- '-MacAddressSpoofing On `' "$script"
+          grep -F -- '-EnableSecureBoot Off `' "$script"
+          grep -F 'qualificationState = "HYPERV_VM_PREPARED_INSTALL_REVIEW_REQUIRED"' "$script"
+          grep -F 'installGood = $false' "$script"
+          grep -F 'airgapGood = $false' "$script"
+          grep -F 'releaseGood = $false' "$script"
+
+          if grep -Eiq 'Invoke-WebRequest|Start-BitsTransfer|curl(\.exe)?|wget(\.exe)?' "$script"; then
+            echo "The qualification harness must never download or substitute the ISO."
+            exit 1
+          fi
+
+          echo "Immutable ISO identity and non-promotion boundaries are present."
