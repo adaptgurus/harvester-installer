@@ -1,0 +1,275 @@
+name: LayerSentry v1.0 controller image lock
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - cmd/layersentry-controller/**
+      - package/layersentry-controller/**
+      - scripts/build-layersentry-controller
+      - scripts/default
+      - scripts/images/harvester-additional-images.txt
+      - scripts/provenance/review_controller_image.py
+      - scripts/provenance/verify_controller_binding.py
+      - tests/test_controller_image_lock.py
+      - .github/workflows/layersentry-v1.0-controller-lock.yml
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: layersentry-v1.0-controller-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lock-controller:
+    name: Build, review and lock LayerSentry bootstrap controller
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+      CONTROLLER_REPOSITORY: ghcr.io/adaptgurus/layersentry-controller
+      CONTROLLER_VERSION: v1.0.0
+      LAYERSENTRY_BUILDER_PULL: always
+      SYFT_CHECK_FOR_APP_UPDATE: "false"
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Run fail-closed source and lock preflight
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+          bash -n scripts/build-layersentry-controller
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover \
+            -s tests -p 'test_controller_image_lock.py' -v
+
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/controller-lock-preflight-report.json"
+          python3 scripts/provenance/verify_builder_binding.py \
+            --lock "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report "$RUNNER_TEMP/controller-builder-binding-report.json"
+
+          python3 - "$LOCK_FILE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          unresolved = {
+              item.get("id")
+              for item in lock.get("unresolved", [])
+              if isinstance(item, dict)
+          }
+          expected = {
+              "layersentry-controller-image",
+              "harvester-offline-image-set",
+          }
+          if unresolved != expected:
+              raise SystemExit(
+                  f"controller lock requires exactly {sorted(expected)} unresolved; "
+                  f"found {sorted(unresolved)}"
+              )
+          if any(
+              item.get("component") == "layersentry-controller"
+              for item in lock.get("source_locks", [])
+              if isinstance(item, dict)
+          ):
+              raise SystemExit("controller source is already locked; refusing replacement")
+          if any(
+              item.get("id") == "layersentry-controller"
+              for item in lock.get("container_images", [])
+              if isinstance(item, dict)
+          ):
+              raise SystemExit("controller image is already locked; refusing replacement")
+          PY
+
+          test "$(grep -Fxc 'ghcr.io/adaptgurus/layersentry-controller:v1.0.0' \
+            scripts/images/harvester-additional-images.txt)" -eq 1
+          grep -Fq 'BUNDLED_NOT_INSTALLED' cmd/layersentry-controller/main.go
+          if grep -Eq 'os/exec|exec\.Command|syscall\.Exec|plugin\.Open|unsafe\.Pointer' \
+            cmd/layersentry-controller/main.go; then
+            echo "controller source contains a prohibited execution mechanism" >&2
+            exit 1
+          fi
+
+      - name: Log in to GHCR for locked builder and controller push
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          auth_dir="$GITHUB_WORKSPACE/.controller-auth"
+          rm -rf "$auth_dir"
+          mkdir -p "$auth_dir"
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker --config "$auth_dir" login ghcr.io \
+                -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build twice and push source-bound controller in locked builder
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf "$GITHUB_WORKSPACE/.controller-evidence"
+          mkdir -p "$GITHUB_WORKSPACE/.controller-evidence"
+          bash scripts/provenance/run_locked_builder.sh bash -lc '
+            set -Eeuo pipefail
+            export DOCKER_CONFIG="$GITHUB_WORKSPACE/.controller-auth"
+            bash scripts/build-layersentry-controller --candidate \
+              "$GITHUB_WORKSPACE/.controller-evidence/$GITHUB_SHA" \
+              "$GITHUB_SHA" \
+              "ghcr.io/adaptgurus/layersentry-controller:source-$GITHUB_SHA" \
+              "ghcr.io/adaptgurus/layersentry-controller:v1.0.0"
+          '
+          echo "CANDIDATE_DIR=$GITHUB_WORKSPACE/.controller-evidence/$GITHUB_SHA" \
+            >> "$GITHUB_ENV"
+
+      - name: Review evidence and merge only controller source and image locks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          review_dir="provenance/controllers/${GITHUB_SHA}"
+          rm -rf "$review_dir"
+          mkdir -p "$review_dir"
+          cp \
+            "$CANDIDATE_DIR/controller-image-candidate.json" \
+            "$CANDIDATE_DIR/controller-sbom.spdx.json" \
+            "$CANDIDATE_DIR/image-inspect.json" \
+            "$CANDIDATE_DIR/source-inputs.tsv" \
+            "$CANDIDATE_DIR/STATUS.md" \
+            "$review_dir/"
+          (
+            cd "$review_dir"
+            sha256sum \
+              controller-image-candidate.json \
+              controller-sbom.spdx.json \
+              image-inspect.json \
+              source-inputs.tsv \
+              STATUS.md \
+              > committed-evidence.sha256
+            sha256sum -c committed-evidence.sha256
+          )
+
+          python3 scripts/provenance/review_controller_image.py \
+            --candidate "$review_dir/controller-image-candidate.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$review_dir/review-dry-run.json"
+          python3 scripts/provenance/review_controller_image.py \
+            --candidate "$review_dir/controller-image-candidate.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$review_dir/review-applied.json" \
+            --apply
+          echo "REVIEW_DIR=$review_dir" >> "$GITHUB_ENV"
+
+      - name: Revalidate controller binding and incomplete production lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/verify_controller_binding.py \
+            --lock "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report "$REVIEW_DIR/controller-binding-verification.json"
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scan-build-inputs \
+            --report "$REVIEW_DIR/post-controller-provenance-report.json"
+
+          python3 - "$LOCK_FILE" "$REVIEW_DIR/review-applied.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          review = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          if lock.get("lock_status") != "incomplete":
+              raise SystemExit("controller review must not complete the production lock")
+          remaining_unresolved_ids = sorted(
+              item.get("id")
+              for item in lock.get("unresolved", [])
+              if isinstance(item, dict) and item.get("id")
+          )
+          if remaining_unresolved_ids != ["harvester-offline-image-set"]:
+              raise SystemExit(
+                  f"unexpected remaining unresolved IDs: {remaining_unresolved_ids}"
+              )
+          if review.get("remaining_unresolved_ids") != remaining_unresolved_ids:
+              raise SystemExit("controller review report does not match merged lock")
+          controller = lock.get("reviewed_controller_image", {})
+          if controller.get("runtime_qualified") is not False:
+              raise SystemExit("controller was incorrectly marked runtime-qualified")
+          if controller.get("installed") is not False:
+              raise SystemExit("controller was incorrectly marked installed")
+          PY
+
+      - name: Prove exact offline controller rebuild from merged lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash scripts/provenance/run_locked_builder.sh bash -lc '
+            set -Eeuo pipefail
+            bash scripts/build-layersentry-controller --from-lock
+            docker image inspect \
+              ghcr.io/adaptgurus/layersentry-controller:v1.0.0 \
+              --format "{{.Id}} {{.Config.User}}"
+          '
+
+      - name: Upload auditable controller evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-controller-${{ github.sha }}
+          path: |
+            ${{ env.CANDIDATE_DIR }}/**
+            ${{ env.REVIEW_DIR }}/**
+            ${{ env.LOCK_FILE }}
+            ${{ runner.temp }}/controller-lock-preflight-report.json
+            ${{ runner.temp }}/controller-builder-binding-report.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
+
+      - name: Remove transient credentials and candidate workspace
+        if: always()
+        shell: bash
+        run: |
+          rm -rf \
+            "$GITHUB_WORKSPACE/.controller-auth" \
+            "$GITHUB_WORKSPACE/.controller-evidence"
+          docker logout ghcr.io >/dev/null 2>&1 || true
+
+      - name: Commit reviewed controller evidence while retaining incomplete lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$LOCK_FILE" "$REVIEW_DIR"
+          test -n "$(git diff --cached --name-only)"
+          unexpected=$(
+            git diff --cached --name-only \
+              | grep -Ev "^(${LOCK_FILE}|${REVIEW_DIR}/)" \
+              || true
+          )
+          test -z "$unexpected"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git commit -m "chore(provenance): lock LayerSentry controller image [skip ci]"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
