@@ -8,6 +8,7 @@ root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 lock_file=${3:-"${root_dir}/provenance/layersentry-v1.0-harvester-v1.8.2.lock.json"}
 verifier="${root_dir}/scripts/provenance/verify_lock.py"
 coverage_verifier="${root_dir}/scripts/provenance/verify_image_coverage.py"
+syft_verifier="${root_dir}/scripts/provenance/verify_staged_syft.py"
 
 mkdir -p "$output_dir"
 
@@ -25,6 +26,87 @@ if [[ -n "$(git -C "$root_dir" status --porcelain --untracked-files=no)" ]]; the
   exit 1
 fi
 
+source_commit=$(git -C "$root_dir" rev-parse HEAD)
+source_tree=$(git -C "$root_dir" write-tree)
+source_date_epoch=$(git -C "$root_dir" show -s --format=%ct HEAD)
+syft_binary=$(command -v syft)
+python3 "$syft_verifier" \
+  --lock "$lock_file" \
+  --binary "$syft_binary" \
+  --report "$output_dir/staged-syft-verification.json"
+
+# Generate the source SBOM from an exact Git archive rather than the live
+# workspace. This excludes .git, dist output and runner residue and binds the
+# SBOM input to the same source commit used for the ISO.
+source_snapshot=$(mktemp -d "${RUNNER_TEMP:-/tmp}/layersentry-source-sbom.XXXXXX")
+cleanup() {
+  rm -rf "$source_snapshot"
+}
+trap cleanup EXIT
+
+git -C "$root_dir" archive --format=tar "$source_commit" \
+  | tar -xf - -C "$source_snapshot"
+SYFT_CHECK_FOR_APP_UPDATE=false syft "$source_snapshot" \
+  -o "spdx-json=$output_dir/source-sbom.spdx.json"
+[[ -s "$output_dir/source-sbom.spdx.json" ]]
+
+python3 - "$output_dir/source-sbom.spdx.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+document = json.loads(path.read_text(encoding="utf-8"))
+spdx_version = document.get("spdxVersion")
+if not isinstance(spdx_version, str) or not spdx_version.startswith("SPDX-"):
+    raise SystemExit("generated source SBOM has no valid SPDX version")
+if not isinstance(document.get("documentNamespace"), str):
+    raise SystemExit("generated source SBOM has no document namespace")
+if not isinstance(document.get("creationInfo"), dict):
+    raise SystemExit("generated source SBOM has no creationInfo")
+if not isinstance(document.get("packages"), list):
+    raise SystemExit("generated source SBOM has no packages array")
+PY
+
+source_sbom_sha256=$(sha256sum "$output_dir/source-sbom.spdx.json" | awk '{print $1}')
+source_sbom_bytes=$(stat -c '%s' "$output_dir/source-sbom.spdx.json")
+python3 - \
+  "$output_dir/staged-syft-verification.json" \
+  "$output_dir/sbom-evidence.json" \
+  "$source_commit" \
+  "$source_tree" \
+  "$source_sbom_sha256" \
+  "$source_sbom_bytes" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+verification_path, output_path, source_commit, source_tree, sbom_sha256, sbom_bytes = sys.argv[1:]
+verification = json.loads(Path(verification_path).read_text(encoding="utf-8"))
+evidence = {
+    "schema": "layersentry.sbom-evidence/v1",
+    "classification": "BUILD_CANDIDATE_ONLY",
+    "source_commit": source_commit,
+    "source_tree": source_tree,
+    "sbom": {
+        "file": "source-sbom.spdx.json",
+        "format": "SPDX JSON",
+        "sha256": sbom_sha256,
+        "bytes": int(sbom_bytes),
+        "input": "git-archive-of-exact-source-commit",
+    },
+    "generator": {
+        "id": verification["id"],
+        "version": verification["version"],
+        "archive_sha256": verification["archive_sha256"],
+        "binary_sha256": verification["binary_sha256"],
+        "binary_bytes": verification["binary_bytes"],
+    },
+    "release_approved": False,
+}
+Path(output_path).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+
 bash "$root_dir/scripts/prepare-production-iso-evidence.sh" "$artifacts_dir" "$output_dir"
 
 image_lists_dir="$output_dir/iso-metadata/image-lists"
@@ -34,13 +116,10 @@ python3 "$coverage_verifier" "$lock_file" "$image_lists_dir" \
 release_iso="$output_dir/layersentry-v1.0-harvester-v1.8.2-amd64.iso"
 [[ -f "$release_iso" ]]
 
-source_commit=$(git -C "$root_dir" rev-parse HEAD)
-source_tree=$(git -C "$root_dir" write-tree)
 lock_sha256=$(sha256sum "$lock_file" | awk '{print $1}')
 iso_sha256=$(sha256sum "$release_iso" | awk '{print $1}')
 iso_sha512=$(sha512sum "$release_iso" | awk '{print $1}')
 iso_bytes=$(stat -c '%s' "$release_iso")
-source_date_epoch=$(git -C "$root_dir" show -s --format=%ct HEAD)
 
 cp "$lock_file" "$output_dir/provenance-lock.json"
 
@@ -58,6 +137,7 @@ lock_path = pathlib.Path(sys.argv[2])
 out_path = pathlib.Path(sys.argv[3])
 lock_bytes = lock_path.read_bytes()
 lock = json.loads(lock_bytes)
+sbom_evidence = json.loads((out_path.parent / "sbom-evidence.json").read_text(encoding="utf-8"))
 
 def git(*args: str) -> str:
     return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
@@ -81,6 +161,7 @@ resolved = {
         "status": lock["lock_status"],
     },
     "source_locks": lock["source_locks"],
+    "sbom": sbom_evidence,
     "ci": {
         "repository": os.environ.get("GITHUB_REPOSITORY", "UNAVAILABLE"),
         "workflow": os.environ.get("GITHUB_WORKFLOW", "UNAVAILABLE"),
@@ -113,7 +194,8 @@ cat > "$output_dir/artifact-digests.json" <<EOF
   "source_commit": "${source_commit}",
   "source_tree": "${source_tree}",
   "source_date_epoch": ${source_date_epoch},
-  "provenance_lock_sha256": "${lock_sha256}"
+  "provenance_lock_sha256": "${lock_sha256}",
+  "source_sbom_sha256": "${source_sbom_sha256}"
 }
 EOF
 
@@ -137,6 +219,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     echo '- Provenance lock: `PASS`'
     echo "- Source commit: \`${source_commit}\`"
     echo "- Source tree: \`${source_tree}\`"
+    echo "- Source SBOM SHA-256: \`${source_sbom_sha256}\`"
     echo "- ISO SHA-256: \`${iso_sha256}\`"
     echo "- ISO SHA-512: \`${iso_sha512}\`"
     echo '- Classification: `BUILD_CANDIDATE_ONLY`'
