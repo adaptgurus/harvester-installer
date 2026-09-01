@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: layersentry-v1.0-full-offline-${{ github.ref }}
@@ -53,13 +54,19 @@ jobs:
             --repo-root "$GITHUB_WORKSPACE" \
             --scan-build-inputs \
             --report provenance-gate-report.json
+          python3 scripts/provenance/verify_builder_binding.py \
+            --lock provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report builder-binding-gate-report.json
 
-      - name: Upload gate report
+      - name: Upload gate reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: layersentry-v1.0-prebuild-gate-${{ github.run_id }}-${{ github.run_attempt }}
-          path: provenance-gate-report.json
+          path: |
+            provenance-gate-report.json
+            builder-binding-gate-report.json
           if-no-files-found: error
           retention-days: 90
 
@@ -75,6 +82,7 @@ jobs:
       BUILD_QCOW: "false"
       SOURCE_DATE_EPOCH: "0"
       SYFT_CHECK_FOR_APP_UPDATE: "false"
+      LAYERSENTRY_BUILDER_PULL: always
     steps:
       - name: Checkout exact gated source commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -96,46 +104,68 @@ jobs:
             --repo-root "$GITHUB_WORKSPACE" \
             --scan-build-inputs \
             --report build-job-provenance-gate-report.json
-
-      - name: Verify checksum-locked Syft before expensive build
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          syft_binary=$(command -v syft)
-          python3 scripts/provenance/verify_staged_syft.py \
+          python3 scripts/provenance/verify_builder_binding.py \
             --lock provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
-            --binary "$syft_binary" \
-            --report prebuild-staged-syft-report.json
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report build-job-builder-binding-report.json
 
-      - name: Build native full-offline ISO
+      - name: Log in to GitHub Container Registry
         shell: bash
         run: |
           set -Eeuo pipefail
-          make default
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Verify checksum-locked Syft inside immutable builder
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          scripts/provenance/run_locked_builder.sh --no-daemon \
+            bash -lc '
+              set -Eeuo pipefail
+              python3 scripts/provenance/verify_staged_syft.py \
+                --lock provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+                --binary "$(command -v syft)" \
+                --report prebuild-staged-syft-report.json
+            '
+
+      - name: Build native full-offline ISO in immutable builder
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          scripts/provenance/run_locked_builder.sh ./scripts/default
 
       - name: Verify locked builder tooling is present
         shell: bash
         run: |
           set -Eeuo pipefail
-          command -v docker
-          command -v xorriso
-          command -v sha256sum
-          command -v sha512sum
-          command -v python3
-          command -v syft
-          docker version
-          xorriso -version
-          python3 --version
-          syft version
+          scripts/provenance/run_locked_builder.sh --no-daemon \
+            bash -lc '
+              set -Eeuo pipefail
+              for command in \
+                docker dockerd python3 git curl wget yq jq helm syft xorriso \
+                mksquashfs zstd tar gzip sha256sum sha512sum mcopy mkfs.vfat \
+                rsync patch awk sed; do
+                command -v "$command"
+              done
+              go version
+              docker --version
+              dockerd --version
+              docker buildx version
+              xorriso -version
+              python3 --version
+              syft version
+            '
 
       - name: Generate immutable candidate evidence and source SBOM
         shell: bash
         run: |
           set -Eeuo pipefail
-          bash scripts/provenance/prepare-release-evidence.sh \
-            dist/artifacts \
-            dist/layersentry-production \
-            provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+          scripts/provenance/run_locked_builder.sh --no-daemon \
+            bash scripts/provenance/prepare-release-evidence.sh \
+              dist/artifacts \
+              dist/layersentry-production \
+              provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
 
       - name: Upload auditable build evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -144,6 +174,7 @@ jobs:
           path: |
             prebuild-staged-syft-report.json
             build-job-provenance-gate-report.json
+            build-job-builder-binding-report.json
             dist/layersentry-production/**
             !dist/layersentry-production/*.iso
           if-no-files-found: error
