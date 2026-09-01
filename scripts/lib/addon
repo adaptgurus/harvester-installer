@@ -4,34 +4,46 @@ set -e
 # load and source addon, the source code is saved
 load_and_source_addon() {
   local apath=$1 # target path to save addon
-  local git=$2
-  local branch=$3
-  echo "Load and source addon from git $git branch $branch to path $apath"
+  local git_url=$2
+  local commit=$3
+
   if [[ -z ${apath} ]]; then
     echo "Specify the target path to load addon source code"
     return 1
   fi
-  if [[ -z ${git} ]]; then
-    git=https://github.com/harvester/addons.git
-    echo "Use default git path ${git}"
+  if [[ -z ${git_url} ]]; then
+    echo "An explicit add-on repository URL is required"
+    return 1
   fi
-  if [[ -z ${branch} ]]; then
-    branch=main
-    echo "Use default branch ${branch}"
+  if [[ ! ${commit} =~ ^[0-9a-f]{40}$ ]]; then
+    echo "An immutable 40-hex add-on commit is required; got '${commit}'"
+    return 1
   fi
-  if [ ! -d ${apath} ];then
-    echo "No existing addons source on ${apath}. Pulling..."
-    git clone --branch ${branch} --single-branch --depth 1 ${git} ${apath}
+
+  echo "Load add-on source from ${git_url} at immutable commit ${commit} into ${apath}"
+  if [[ ! -d ${apath}/.git ]]; then
+    mkdir -p "${apath}"
+    git -C "${apath}" init
+    git -C "${apath}" remote add origin "${git_url}"
+    git -C "${apath}" fetch --depth 1 origin "${commit}"
+    git -C "${apath}" -c advice.detachedHead=false checkout --detach FETCH_HEAD
   else
-    echo "Addon path ${apath} is existing, reuse"
+    echo "Add-on path ${apath} exists; immutable commit validation is mandatory"
   fi
 
-  ls -alth ${apath}
+  local actual_commit
+  actual_commit=$(git -C "${apath}" rev-parse HEAD)
+  if [[ ${actual_commit} != ${commit} ]]; then
+    echo "Add-on source mismatch: expected ${commit}, found ${actual_commit}"
+    return 1
+  fi
 
-  source ${apath}/version_info
-  source ${apath}/scripts/hack/patch-rancher-monitoring
-  source ${apath}/scripts/hack/patch-rancher-logging
-  source ${apath}/scripts/hack/patch-rancher-monitoring-crd
+  ls -alth "${apath}"
+
+  source "${apath}/version_info"
+  source "${apath}/scripts/hack/patch-rancher-monitoring"
+  source "${apath}/scripts/hack/patch-rancher-logging"
+  source "${apath}/scripts/hack/patch-rancher-monitoring-crd"
 
   if [[ -z ${RANCHER_LOGGING_CHART_VERSION} ]] || [[ -z ${RANCHER_MONITORING_CHART_VERSION} ]] || [[ -z ${HARVESTER_EVENTROUTER_FULL_TAG} ]]; then
     echo "Monitoring, logging and eventrouter are not fully defined on ${apath}/version_info"

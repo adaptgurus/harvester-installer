@@ -7,11 +7,15 @@ PACKAGE_HARVESTER_OS_DIR="${TOP_DIR}/package/harvester-os"
 PACKAGE_HARVESTER_REPO_DIR="${TOP_DIR}/package/harvester-repo"
 : ${RKE2_IMAGE_REPO:=https://github.com/rancher/rke2/releases/download/}
 
+# Immutable LayerSentry v1.0 embedded-platform source locks.
+HARVESTER_COMMIT="5320dfa6770f63406750e7c64b24ed87c543e6ad"
+ADDONS_COMMIT="f60d73d894e00f18d5e11cd21a301ed1b016631c"
+
 cd ${TOP_DIR}
 
 source ${SCRIPTS_DIR}/lib/addon
 addons_path=${TOP_DIR}/../addons
-load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2
+load_and_source_addon ${addons_path} https://github.com/harvester/addons.git ${ADDONS_COMMIT}
 # generate template file in ${addons_path}, and this is used for subsequent checks
 generate_addon ${addons_path}
 
@@ -40,9 +44,18 @@ mkdir -p ${RANCHERD_IMAGES_DIR}
 
 # Prepare Harvester chart
 harvester_path=../harvester
-if [ ! -d ${harvester_path} ];then
-  echo "No existing harvester source. Pulling..."
-  git clone --branch v1.8.2 --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester
+if [ ! -d ${harvester_path}/.git ];then
+  echo "No existing Harvester source. Fetching immutable commit ${HARVESTER_COMMIT}..."
+  mkdir -p "${harvester_path}"
+  git -C "${harvester_path}" init
+  git -C "${harvester_path}" remote add origin https://github.com/harvester/harvester.git
+  git -C "${harvester_path}" fetch --depth 1 origin "${HARVESTER_COMMIT}"
+  git -C "${harvester_path}" -c advice.detachedHead=false checkout --detach FETCH_HEAD
+fi
+actual_harvester_commit=$(git -C "${harvester_path}" rev-parse HEAD)
+if [ "${actual_harvester_commit}" != "${HARVESTER_COMMIT}" ]; then
+  echo "Harvester source mismatch: expected ${HARVESTER_COMMIT}, found ${actual_harvester_commit}"
+  exit 1
 fi
 
 # Revert harvester chart version patch to clean dirty git status
@@ -273,8 +286,10 @@ curl ${longhorn_image_url}>>${image_list_file}
 sed -i '/longhornio\/openshift-origin-oauth-proxy*/d' ${image_list_file}
 
 # format image list
-awk -F ':' '{if($2==""){print $1":latest"}else{print $0}}' "${image_list_file}" | \
-awk -F '/' '{if(NF>=3){print $0} else if(NF==2){print "docker.io/"$0}else if(NF==1){print "docker.io/library/"$0}}' >"${image_list_file}.tmp"
+normalized_image_list="${image_list_file}.normalized"
+python3 "${SCRIPTS_DIR}/provenance/normalize_image_list.py" "${image_list_file}" "${normalized_image_list}"
+awk -F '/' '{if(NF>=3){print $0} else if(NF==2){print "docker.io/"$0}else if(NF==1){print "docker.io/library/"$0}}' "${normalized_image_list}" >"${image_list_file}.tmp"
+rm -f "${normalized_image_list}"
 
 # clean image list
 sort -u "${image_list_file}.tmp" | \
@@ -291,11 +306,9 @@ upgrade_image_repo=$(yq -e e '.upgrade.image.repository' $values_file)
 upgrade_image_tag=$(yq -e e '.upgrade.image.tag' $values_file)
 if [ "$upgrade_image_tag" != "$HARVESTER_VERSION" ]; then
   docker tag "${upgrade_image_repo}:${upgrade_image_tag}" "rancher/harvester-upgrade:${HARVESTER_VERSION}"
-  docker tag "${upgrade_image_repo}:${upgrade_image_tag}" "rancher/harvester-upgrade:${HARVESTER_APP_VERSION}-head"
   image_list_file="${IMAGES_LISTS_DIR}/harvester-extra-${VERSION}.txt"
   image_archive="${IMAGES_DIR}/harvester-extra-${VERSION}.tar"
   echo "docker.io/rancher/harvester-upgrade:${HARVESTER_VERSION}" > ${image_list_file}
-  echo "docker.io/rancher/harvester-upgrade:${HARVESTER_APP_VERSION}-head" >> ${image_list_file}
   docker image save -o $image_archive $(<$image_list_file)
   zstd --rm $image_archive -o "${image_archive}.zst"
   add_image_list_to_metadata "common" $BUNDLE_DIR $image_list_file "${image_archive}.zst"

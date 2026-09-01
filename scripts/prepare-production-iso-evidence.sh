@@ -72,7 +72,7 @@ metadata:
   generatedAtUtc: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 source:
   repository: adaptgurus/harvester-installer
-  branch: feat/layersentry-v1.8.2-production
+  branch: layersentry-v1.0-dev
   commit: ${source_commit}
   workflowRunId: ${GITHUB_RUN_ID:-UNAVAILABLE}
   harvesterRef: v1.8.2
@@ -112,7 +112,7 @@ find "$output_dir" -maxdepth 4 -type f -printf '%p\t%s bytes\n' | sort
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   {
-    echo '# LayerSentry v1.8.2 production offline ISO'
+    echo '# LayerSentry v1.0 / embedded Harvester v1.8.2 offline ISO'
     echo
     echo '- Classification: `BUILD_GOOD`'
     echo "- Source commit: `${source_commit}`"

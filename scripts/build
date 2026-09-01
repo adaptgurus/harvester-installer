@@ -18,7 +18,11 @@ cd ${TOP_DIR}
 harvester_path=../harvester
 if [ ! -d ${harvester_path} ];then
     echo "No existing harvester source. Pulling ${HARVESTER_REF}..."
-    git clone --branch ${HARVESTER_REF} --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester
+    mkdir -p "${harvester_path}"
+    git -C "${harvester_path}" init
+    git -C "${harvester_path}" remote add origin https://github.com/harvester/harvester.git
+    git -C "${harvester_path}" fetch --depth 1 origin "${HARVESTER_COMMIT}"
+    git -C "${harvester_path}" -c advice.detachedHead=false checkout --detach FETCH_HEAD
 else
     # When building against locally modified harvester source with
     # "-v /path/to/local/harvester/repo:/go/src/github.com/harvester/harvester"
@@ -39,22 +43,14 @@ if [ "${actual_harvester_commit}" != "${HARVESTER_COMMIT}" ]; then
     echo "Harvester source mismatch: expected ${HARVESTER_REF} at ${HARVESTER_COMMIT}, found ${actual_harvester_commit}"
     exit 1
 fi
-if ! git -C ${harvester_path} tag --points-at HEAD | grep -Fxq "${HARVESTER_REF}"; then
-    echo "Harvester source is at the expected commit but the ${HARVESTER_REF} tag is unavailable"
-    exit 1
-fi
 
 source ${SCRIPTS_DIR}/lib/addon
 addons_path=${TOP_DIR}/../addons
-load_and_source_addon ${addons_path} https://github.com/harvester/addons.git ${ADDONS_REF}
+load_and_source_addon ${addons_path} https://github.com/harvester/addons.git ${ADDONS_COMMIT}
 
 actual_addons_commit=$(git -C ${addons_path} rev-parse HEAD)
 if [ "${actual_addons_commit}" != "${ADDONS_COMMIT}" ]; then
     echo "Harvester addons source mismatch: expected ${ADDONS_REF} at ${ADDONS_COMMIT}, found ${actual_addons_commit}"
-    exit 1
-fi
-if ! git -C ${addons_path} tag --points-at HEAD | grep -Fxq "${ADDONS_REF}"; then
-    echo "Harvester addons source is at the expected commit but the ${ADDONS_REF} tag is unavailable"
     exit 1
 fi
 

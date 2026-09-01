@@ -9,6 +9,9 @@ IMAGES_LISTS_DIR="${BUNDLE_DIR}/harvester/images-lists"
 RANCHERD_IMAGES_DIR="${BUNDLE_DIR}/rancherd/images"
 VERSION_FILE="version.yaml"
 
+# Immutable Harvester add-ons source lock.
+ADDONS_COMMIT="f60d73d894e00f18d5e11cd21a301ed1b016631c"
+
 # LayerSentry releases the full offline ISO only.
 DISABLE_BUILD_NET_INSTALL_ISO=true
 if [ "${ARCH}" == "arm64" ]
@@ -18,7 +21,7 @@ fi
 
 source ${SCRIPTS_DIR}/lib/addon
 addons_path=${TOP_DIR}/../addons
-load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2
+load_and_source_addon ${addons_path} https://github.com/harvester/addons.git ${ADDONS_COMMIT}
 
 MONITORING_VERSION=${RANCHER_MONITORING_CHART_VERSION}
 LOGGING_VERSION=${RANCHER_LOGGING_CHART_VERSION}

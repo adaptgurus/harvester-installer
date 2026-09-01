@@ -1,0 +1,133 @@
+{
+  "schema": "layersentry.provenance-lock/v1",
+  "lock_status": "incomplete",
+  "generated_at": "2026-09-01T12:38:02Z",
+  "release_identity": {
+    "product": {
+      "name": "LayerSentry",
+      "version": "v1.0",
+      "artifact_namespace": "layersentry/v1.0"
+    },
+    "embedded_platform": {
+      "name": "Harvester",
+      "version": "v1.8.2",
+      "artifact_namespace": "harvester/v1.8.2"
+    }
+  },
+  "product_source": {
+    "repository": "https://github.com/adaptgurus/harvester-installer.git",
+    "required_branch": "layersentry-v1.0-dev",
+    "audited_corrective_base_commit": "ce3b8b4c2ce263325615c513d56edcbfd8476b98",
+    "final_commit_capture": "runtime-git-head",
+    "notes": "The final LayerSentry source commit is captured by the provenance gate after this corrective overlay is committed. It is not embedded in this tracked file because a Git commit cannot safely contain its own hash."
+  },
+  "source_locks": [
+    {
+      "component": "harvester-installer-upstream-baseline",
+      "repository": "https://github.com/harvester/harvester-installer.git",
+      "version_label": "v1.8.2",
+      "commit": "89d375137831667e22c729e4ca04e8fe2c6ac1bc"
+    },
+    {
+      "component": "harvester-core",
+      "repository": "https://github.com/harvester/harvester.git",
+      "version_label": "v1.8.2",
+      "commit": "5320dfa6770f63406750e7c64b24ed87c543e6ad"
+    },
+    {
+      "component": "harvester-addons",
+      "repository": "https://github.com/harvester/addons.git",
+      "version_label": "v1.8.2",
+      "commit": "f60d73d894e00f18d5e11cd21a301ed1b016631c"
+    }
+  ],
+  "ci_actions": [
+    {
+      "uses": "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "version_label": "v4.2.2"
+    },
+    {
+      "uses": "actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5",
+      "version_label": "v5.5.0"
+    },
+    {
+      "uses": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "version_label": "v4.6.2"
+    },
+    {
+      "uses": "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+      "version_label": "v4.3.0"
+    },
+    {
+      "uses": "aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a",
+      "version_label": "v4.3.1"
+    }
+  ],
+  "container_images": [],
+  "charts": [],
+  "packages": [],
+  "toolchain_artifacts": [],
+  "unresolved": [
+    {
+      "id": "layersentry-controller-image",
+      "kind": "container-image",
+      "required_resolution": "Record the exact OCI reference as repository@sha256:<64-hex-digest>; do not retain a tag-only reference."
+    },
+    {
+      "id": "layersentry-full-offline-builder-image",
+      "kind": "container-image",
+      "required_resolution": "Record and use the exact builder image digest."
+    },
+    {
+      "id": "trivy-scanner-image",
+      "kind": "container-image",
+      "observed_mutable_reference": "aquasec/trivy:0.69.3",
+      "required_resolution": "Resolve the approved image to an OCI digest and replace the tag-only workflow reference."
+    },
+    {
+      "id": "bci-evidence-verifier-image",
+      "kind": "container-image",
+      "observed_mutable_reference": "registry.suse.com/bci/bci-base:15.7",
+      "required_resolution": "Resolve the approved image to an OCI digest and replace the tag-only workflow input."
+    },
+    {
+      "id": "syft-sbom-generator",
+      "kind": "toolchain-artifact",
+      "required_resolution": "Pin either an OCI digest or a release asset URL plus SHA-256; never download from a latest-release endpoint."
+    },
+    {
+      "id": "harvester-offline-image-set",
+      "kind": "container-image-set",
+      "required_resolution": "Enumerate every image consumed by the full-offline build as repository@sha256:<digest> and checksum the canonical list."
+    },
+    {
+      "id": "embedded-helm-chart-set",
+      "kind": "chart-set",
+      "required_resolution": "Enumerate each embedded chart with immutable version, source URL, and SHA-256 archive checksum."
+    },
+    {
+      "id": "harvester-os-and-package-inputs",
+      "kind": "package-set",
+      "required_resolution": "Enumerate the OS/rootfs/kernel/firmware/package inputs with source and SHA-256 checksums."
+    },
+    {
+      "id": "build-toolchain",
+      "kind": "toolchain-set",
+      "required_resolution": "Record exact Go, Docker/BuildKit, Python, yq/jq, ISO tooling and runner/container versions with immutable digests or checksums."
+    }
+  ],
+  "policy": {
+    "require_complete_lock_before_build": true,
+    "require_oci_digest_for_every_image": true,
+    "require_sha256_for_charts_packages_and_tools": true,
+    "require_exact_commit_for_git_sources": true,
+    "require_exact_commit_for_ci_actions": true,
+    "forbid_tag_only_images": true,
+    "forbid_latest": true,
+    "forbid_head_images": true,
+    "forbid_branch_git_refs": true,
+    "forbid_floating_chart_versions": true,
+    "forbid_override_bypass": true,
+    "promotion_requires_source_build_provenance_deployment_sha_equality": true
+  }
+}
