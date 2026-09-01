@@ -73,9 +73,16 @@ jobs:
           test -z "$(git -C "$source_dir" tag -l "$HARVESTER_RELEASE_REF")"
 
           source scripts/version-harvester "$source_dir"
+          printf '%s\n' \
+            "resolved-version=$HARVESTER_VERSION" \
+            "resolved-app-version=$HARVESTER_APP_VERSION" \
+            "resolved-chart-version=$HARVESTER_CHART_VERSION" \
+            "resolved-kubevirt-version=$HARVESTER_KUBEVIRT_VERSION" \
+            "resolved-min-upgradable-version=$HARVESTER_MIN_UPGRADABLE_VERSION"
           test "$HARVESTER_VERSION" = "$HARVESTER_RELEASE_REF"
           test "$HARVESTER_APP_VERSION" = "$HARVESTER_RELEASE_REF"
           test "$HARVESTER_CHART_VERSION" = "${HARVESTER_RELEASE_REF#v}"
+          test "$HARVESTER_MIN_UPGRADABLE_VERSION" = "v1.7.0"
           test "$(git -C "$source_dir" rev-parse "refs/tags/$HARVESTER_RELEASE_REF^{commit}")" = "$HARVESTER_RELEASE_COMMIT"
           [[ ! "$HARVESTER_VERSION $HARVESTER_APP_VERSION $HARVESTER_CHART_VERSION" =~ head ]]
 
