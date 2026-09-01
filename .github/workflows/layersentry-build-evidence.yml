@@ -1,0 +1,204 @@
+name: LayerSentry extract production ISO evidence
+
+on:
+  push:
+    branches:
+      - feat/layersentry-v1.8.2-production
+    paths:
+      - .github/workflows/layersentry-build-evidence.yml
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful production ISO workflow run ID
+        required: true
+        default: "33479776571"
+      source_artifact_name:
+        description: Production ISO artifact name
+        required: true
+        default: layersentry-v1.0-harvester-v1.8.2-amd64-offline-iso
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: layersentry-v1.8.2-production-evidence
+  cancel-in-progress: false
+
+jobs:
+  extract-and-qualify-build-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_RUN_ID: ${{ github.event.inputs.source_run_id || '33479776571' }}
+      SOURCE_ARTIFACT_NAME: ${{ github.event.inputs.source_artifact_name || 'layersentry-v1.0-harvester-v1.8.2-amd64-offline-iso' }}
+      EXPECTED_SOURCE_COMMIT: a104eab8cc5eca42b7ef002fc96561a21be3f163
+      EXPECTED_ARTIFACT_ID: "9790788698"
+      EXPECTED_ARTIFACT_SHA256: 6fae4189304997926268b39d5641ed82333325b585432034c19074623909d9a3
+    steps:
+      - name: Checkout evidence workflow source
+        uses: actions/checkout@v4
+        with:
+          ref: feat/layersentry-v1.8.2-production
+          fetch-depth: 1
+
+      - name: Download successful production ISO candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: downloaded-candidate
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Independently verify candidate and extract small evidence
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y xorriso
+
+          mkdir -p qualified-evidence
+
+          iso=$(find downloaded-candidate -type f -name 'layersentry-v1.0-harvester-v1.8.2-amd64.iso' -print -quit)
+          checksum_file=$(find downloaded-candidate -type f -name 'layersentry-v1.0-harvester-v1.8.2-amd64.iso.sha512' -print -quit)
+          bytes_file=$(find downloaded-candidate -type f -name 'layersentry-v1.0-harvester-v1.8.2-amd64.iso.bytes' -print -quit)
+          manifest=$(find downloaded-candidate -type f -name 'build-manifest.yaml' -print -quit)
+          source_commit_file=$(find downloaded-candidate -type f -name 'source-commit.txt' -print -quit)
+          packaged_release_metadata=$(find downloaded-candidate -type f -path '*/iso-metadata/harvester-release.yaml' -print -quit)
+
+          for required in "$iso" "$checksum_file" "$bytes_file" "$manifest" "$source_commit_file" "$packaged_release_metadata"; do
+            if [ -z "$required" ] || [ ! -f "$required" ]; then
+              echo "Required production evidence file is missing: $required"
+              find downloaded-candidate -maxdepth 4 -type f -printf '%p\n' | sort
+              exit 1
+            fi
+          done
+
+          expected_sha512=$(awk '{print $1}' "$checksum_file")
+          actual_sha512=$(sha512sum "$iso" | awk '{print $1}')
+          test -n "$expected_sha512"
+          test "$actual_sha512" = "$expected_sha512"
+
+          expected_bytes=$(tr -d '[:space:]' < "$bytes_file")
+          actual_bytes=$(stat -c '%s' "$iso")
+          test -n "$expected_bytes"
+          test "$actual_bytes" = "$expected_bytes"
+
+          source_commit=$(tr -d '[:space:]' < "$source_commit_file")
+          test "$source_commit" = "$EXPECTED_SOURCE_COMMIT"
+          grep -F "commit: $EXPECTED_SOURCE_COMMIT" "$manifest"
+          grep -F 'harvesterRef: v1.8.2' "$manifest"
+          grep -F 'harvesterCommit: 5320dfa6770f63406750e7c64b24ed87c543e6ad' "$manifest"
+          grep -F 'addonsRef: v1.8.2' "$manifest"
+          grep -F 'addonsCommit: f60d73d894e00f18d5e11cd21a301ed1b016631c' "$manifest"
+          grep -F 'fullOfflineIso: true' "$manifest"
+          grep -F 'netInstallIsoGenerated: false' "$manifest"
+          grep -F 'installGood: false' "$manifest"
+          grep -F 'airgapGood: false' "$manifest"
+          grep -F 'releaseGood: false' "$manifest"
+
+          xorriso -osirrox on \
+            -indev "$iso" \
+            -extract /harvester-release.yaml qualified-evidence/harvester-release.from-iso.yaml
+
+          xorriso -osirrox on \
+            -indev "$iso" \
+            -extract /bundle/harvester/images-lists/harvester-images-v1.0.txt qualified-evidence/harvester-images-v1.0.txt
+
+          cmp -s "$packaged_release_metadata" qualified-evidence/harvester-release.from-iso.yaml
+
+          grep -F 'harvester: v1.8.2' qualified-evidence/harvester-release.from-iso.yaml
+          grep -F 'harvesterChart: 1.8.2' qualified-evidence/harvester-release.from-iso.yaml
+          grep -F 'os: Harvester v1.8.2' qualified-evidence/harvester-release.from-iso.yaml
+          grep -F 'kubernetes: v1.35.7+rke2r1' qualified-evidence/harvester-release.from-iso.yaml
+          grep -F 'rancher: v2.14.3' qualified-evidence/harvester-release.from-iso.yaml
+          grep -F 'kubevirt: 1.7.4-150700.3.24.2' qualified-evidence/harvester-release.from-iso.yaml
+
+          grep -F 'docker.io/rancher/harvester:v1.8.2' qualified-evidence/harvester-images-v1.0.txt
+          grep -F 'docker.io/rancher/harvester-webhook:v1.8.2' qualified-evidence/harvester-images-v1.0.txt
+          grep -F 'docker.io/rancher/harvester-upgrade:v1.8.2' qualified-evidence/harvester-images-v1.0.txt
+          grep -F 'docker.io/longhornio/longhorn-manager:v1.11.3' qualified-evidence/harvester-images-v1.0.txt
+
+          if grep -E 'rancher/(harvester|harvester-webhook|harvester-upgrade):v1\.8-head|0\.0\.0-v1\.8-[0-9a-f]{8}|Harvester [0-9a-f]{8}' \
+            qualified-evidence/harvester-images-v1.0.txt qualified-evidence/harvester-release.from-iso.yaml; then
+            echo 'Development Harvester provenance was found in the production ISO candidate'
+            exit 1
+          fi
+
+          cp "$checksum_file" qualified-evidence/
+          cp "$bytes_file" qualified-evidence/
+          cp "$manifest" qualified-evidence/original-build-manifest.yaml
+          cp "$source_commit_file" qualified-evidence/
+          cp "$packaged_release_metadata" qualified-evidence/harvester-release.packaged.yaml
+
+          cat > qualified-evidence/build-qualification.yaml <<EOF
+          apiVersion: release.layersentry.io/v1
+          kind: IsoBuildQualification
+          metadata:
+            product: LayerSentry
+            productVersion: "1.0"
+            qualifiedAtUtc: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          sourceBuild:
+            workflowRunId: ${SOURCE_RUN_ID}
+            artifactId: ${EXPECTED_ARTIFACT_ID}
+            artifactName: ${SOURCE_ARTIFACT_NAME}
+            artifactDigestSha256: ${EXPECTED_ARTIFACT_SHA256}
+            sourceCommit: ${source_commit}
+          iso:
+            filename: layersentry-v1.0-harvester-v1.8.2-amd64.iso
+            bytes: ${actual_bytes}
+            sha512: ${actual_sha512}
+            classification: BUILD_GOOD
+          verified:
+            checksumMatches: true
+            byteCountMatches: true
+            embeddedReleaseMetadataMatchesPackagedEvidence: true
+            harvesterRelease: v1.8.2
+            harvesterDevelopmentRefsAbsent: true
+            fullOfflineIso: true
+            netInstallIsoGenerated: false
+          remainingGates:
+            bootSmokeGood: false
+            installGood: false
+            airgapGood: false
+            releaseGood: false
+          EOF
+
+          cat > qualified-evidence/README.md <<EOF
+          # LayerSentry v1.0 / Harvester v1.8.2 build evidence
+
+          This package independently validates the successful production ISO candidate from GitHub Actions run ${SOURCE_RUN_ID}.
+
+          Classification: **BUILD_GOOD** only.
+
+          This does not claim boot-smoke, installation, true-air-gap, upgrade, recovery, or production release qualification.
+          EOF
+
+          cat qualified-evidence/build-qualification.yaml
+          find qualified-evidence -maxdepth 2 -type f -printf '%f\t%s bytes\n' | sort
+
+          {
+            echo '# LayerSentry production ISO build qualification'
+            echo
+            echo '- Classification: `BUILD_GOOD`'
+            echo "- Source run: `${SOURCE_RUN_ID}`"
+            echo "- Source commit: `${source_commit}`"
+            echo "- ISO bytes: `${actual_bytes}`"
+            echo "- ISO SHA-512: `${actual_sha512}`"
+            echo '- Harvester: `v1.8.2`'
+            echo '- RKE2: `v1.35.7+rke2r1`'
+            echo '- Rancher: `v2.14.3`'
+            echo '- Development Harvester refs: absent'
+            echo '- Remaining: boot, installation, air-gap, recovery and release gates'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compact auditable build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-harvester-v1.8.2-build-evidence-run-${{ env.SOURCE_RUN_ID }}
+          path: qualified-evidence/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
