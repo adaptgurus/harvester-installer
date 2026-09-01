@@ -6,13 +6,19 @@ SCRIPTS_DIR="${TOP_DIR}/scripts"
 PACKAGE_HARVESTER_OS_DIR="${TOP_DIR}/package/harvester-os"
 PACKAGE_HARVESTER_INSTALLER_DIR="${TOP_DIR}/package/harvester-installer"
 
+# LayerSentry production builds must use immutable upstream release sources.
+HARVESTER_REF="v1.8.2"
+HARVESTER_COMMIT="5320dfa6770f63406750e7c64b24ed87c543e6ad"
+ADDONS_REF="v1.8.2"
+ADDONS_COMMIT="f60d73d894e00f18d5e11cd21a301ed1b016631c"
+
 cd ${TOP_DIR}
 
-# Pull harvester source and determine harvester version
+# Pull Harvester source and determine Harvester version.
 harvester_path=../harvester
 if [ ! -d ${harvester_path} ];then
-    echo "No existing harvester source. Pulling..."
-    git clone --branch v1.8 --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester
+    echo "No existing harvester source. Pulling ${HARVESTER_REF}..."
+    git clone --branch ${HARVESTER_REF} --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester
 else
     # When building against locally modified harvester source with
     # "-v /path/to/local/harvester/repo:/go/src/github.com/harvester/harvester"
@@ -28,9 +34,29 @@ else
     git config --global --add safe.directory /go/src/github.com/harvester/harvester
 fi
 
+actual_harvester_commit=$(git -C ${harvester_path} rev-parse HEAD)
+if [ "${actual_harvester_commit}" != "${HARVESTER_COMMIT}" ]; then
+    echo "Harvester source mismatch: expected ${HARVESTER_REF} at ${HARVESTER_COMMIT}, found ${actual_harvester_commit}"
+    exit 1
+fi
+if ! git -C ${harvester_path} tag --points-at HEAD | grep -Fxq "${HARVESTER_REF}"; then
+    echo "Harvester source is at the expected commit but the ${HARVESTER_REF} tag is unavailable"
+    exit 1
+fi
+
 source ${SCRIPTS_DIR}/lib/addon
 addons_path=${TOP_DIR}/../addons
-load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8
+load_and_source_addon ${addons_path} https://github.com/harvester/addons.git ${ADDONS_REF}
+
+actual_addons_commit=$(git -C ${addons_path} rev-parse HEAD)
+if [ "${actual_addons_commit}" != "${ADDONS_COMMIT}" ]; then
+    echo "Harvester addons source mismatch: expected ${ADDONS_REF} at ${ADDONS_COMMIT}, found ${actual_addons_commit}"
+    exit 1
+fi
+if ! git -C ${addons_path} tag --points-at HEAD | grep -Fxq "${ADDONS_REF}"; then
+    echo "Harvester addons source is at the expected commit but the ${ADDONS_REF} tag is unavailable"
+    exit 1
+fi
 
 MONITORING_VERSION=${RANCHER_MONITORING_CHART_VERSION}
 LOGGING_VERSION=${RANCHER_LOGGING_CHART_VERSION}
