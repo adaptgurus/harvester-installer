@@ -1,0 +1,118 @@
+name: LayerSentry v1.0 provenance discovery
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-provenance-discovery.yml
+      - scripts/provenance/collect-discovery-inputs.sh
+      - scripts/provenance/discover_image_digests.py
+      - tests/test_discover_image_digests.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layersentry-v1.0-provenance-discovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Capture non-release immutable input candidates
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout exact discovery source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify discovery source and utilities
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          bash -n scripts/provenance/collect-discovery-inputs.sh
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover -s tests -p 'test_discover_image_digests.py' -v
+
+      - name: Collect exact source aliases and checksummed inputs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          output="provenance/discovery/$GITHUB_SHA"
+          rm -rf "$output"
+          bash scripts/provenance/collect-discovery-inputs.sh "$output" "$GITHUB_SHA"
+          echo "DISCOVERY_OUTPUT=$output" >> "$GITHUB_ENV"
+
+      - name: Resolve image aliases to OCI digest candidates
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/discover_image_digests.py \
+            --image-list "$DISCOVERY_OUTPUT/image-aliases.txt" \
+            --output "$DISCOVERY_OUTPUT/image-lock-candidate.json" \
+            --failures "$DISCOVERY_OUTPUT/image-resolution-failures.json" \
+            --source-commit "$GITHUB_SHA" \
+            --attempts 3 \
+            --retry-delay 2
+
+      - name: Generate discovery status
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - "$DISCOVERY_OUTPUT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          output = Path(sys.argv[1])
+          candidate = json.loads(
+              (output / "image-lock-candidate.json").read_text(encoding="utf-8")
+          )
+          discovery = json.loads(
+              (output / "input-discovery.json").read_text(encoding="utf-8")
+          )
+          resolved = candidate["resolved_alias_count"]
+          total = candidate["alias_count"]
+          unresolved = candidate["unresolved_alias_count"]
+          text = f"""# LayerSentry v1.0 provenance discovery
+
+          - Source commit: `{candidate["source_commit"]}`
+          - Product: LayerSentry v1.0
+          - Embedded platform: Harvester v1.8.2
+          - Image aliases discovered: {total}
+          - Image aliases resolved to OCI digests: {resolved}
+          - Image aliases still unresolved: {unresolved}
+          - Verified tool artifacts: {len(discovery["verified_tool_artifacts"])}
+          - Downloaded input manifests checksummed: {len(discovery["downloaded_inputs"])}
+          - Release approval: **false**
+          - Lock promotion: **not performed**
+
+          This directory is discovery evidence only. The production lock remains fail-closed
+          until every required image, chart, package and builder input is reviewed and pinned.
+          """
+          (output / "STATUS.md").write_text(text, encoding="utf-8")
+          PY
+          sha256sum "$DISCOVERY_OUTPUT"/*.json "$DISCOVERY_OUTPUT"/*.txt \
+            > "$DISCOVERY_OUTPUT/discovery-files.sha256"
+          git diff --check
+
+      - name: Commit immutable discovery evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --quiet origin layersentry-v1.0-dev
+          test "$(git rev-parse origin/layersentry-v1.0-dev)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$DISCOVERY_OUTPUT"
+          test -n "$(git status --porcelain)"
+          git commit -m "chore(provenance): capture input discovery for $GITHUB_SHA [skip ci]"
+          git push origin HEAD:refs/heads/layersentry-v1.0-dev
