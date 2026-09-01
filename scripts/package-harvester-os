@@ -142,7 +142,7 @@ chmod -R a=r,u+w,a+X "${extract_dir}"
 cp "${extract_dir}/rootfs.squashfs" "${ARTIFACTS_DIR}/${PROJECT_PREFIX}-rootfs-${ARCH}.squashfs"
 
 # Currently only building Net-install ISO for amd64 builds.
-if [ "${ARCH}" == "amd64" ]
+if [ "${ARCH}" == "amd64" ] && [ "${DISABLE_BUILD_NET_INSTALL_ISO}" != "true" ]
 then
 # Use dd to create empty image, create an empty FAT32 filesystem
 # and copy EFI files to it to make it UEFI bootable
