@@ -1,0 +1,15 @@
+{
+  "bytes": 29483816,
+  "format": "SPDX JSON",
+  "generator": {
+    "archive_sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+    "binary_sha256": "abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+    "id": "syft-linux-amd64",
+    "version": "v1.51.1"
+  },
+  "package_count": 3962,
+  "release_approved": false,
+  "schema": "layersentry.os-package-sbom-evidence/v1",
+  "sha256": "5104f06adc6805ab3d461e9d7d6a9c205e104cde0a96a9411a7591c411c8a522",
+  "source": "docker:docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4"
+}

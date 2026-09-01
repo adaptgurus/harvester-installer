@@ -1,0 +1,13 @@
+{
+  "base_os_alias": "docker.io/rancher/harvester-os:v1.8-20260806",
+  "base_os_digest": "sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+  "base_os_ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+  "dockerfile_sha256": "57431ab9f16c190fb91a76da17cac24fa7a1ad12b3743cb3e431d0d242e05eb1",
+  "package_script_sha256": "fc0150e1870a7415192fba6cf7d827ebd3c8bcfa54a119678f39383dc60ee7cf",
+  "plan_sha256": "7421ab3e1224abde41883f9d7bfcd47ef33a25aa5e421f27af818c78f9f8f403",
+  "platform": "linux/amd64",
+  "schema": "layersentry.os-package-binding-report/v1",
+  "verified": true,
+  "wharfie_sha256": "e6b5d27e5b5815ece828e3d2f4012ccec1e40dceb4e639815d6cdbc0f22e2fa8",
+  "wharfie_version": "v0.6.8"
+}

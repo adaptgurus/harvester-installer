@@ -1,0 +1,22 @@
+{
+  "applied": true,
+  "base_os_ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+  "candidate_sha256": "6c28867d702b42b32f523dc828426e58eb232de0dc72ec1a6d977a876efab279",
+  "firmware_record_count": 5196,
+  "lock_status": "incomplete",
+  "package_input_count": 11,
+  "plan_sha256": "7421ab3e1224abde41883f9d7bfcd47ef33a25aa5e421f27af818c78f9f8f403",
+  "production_lock_complete": false,
+  "release_approved": false,
+  "remaining_unresolved_count": 4,
+  "remaining_unresolved_ids": [
+    "build-toolchain",
+    "harvester-offline-image-set",
+    "layersentry-controller-image",
+    "layersentry-full-offline-builder-image"
+  ],
+  "removed_unresolved_id": "harvester-os-and-package-inputs",
+  "rpm_package_count": 507,
+  "schema": "layersentry.os-package-lock-review/v1",
+  "source_commit": "04fc143b0807bfe8b219349e3420dba534f8efde"
+}

@@ -1,0 +1,32 @@
+{
+  "architecture": "amd64",
+  "image_id": "sha256:55a0c25469fd3e85e33b35f3f98843acab7da787ec532e5711fca42000b605b2",
+  "os": "linux",
+  "ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+  "repo_digests": [
+    "rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4"
+  ],
+  "rootfs_layers": [
+    "sha256:9a8cec9d9bd7def0d01bf04232ebef762ccb00e20092e4e8f7fcc716fc3666c6",
+    "sha256:13a614dcacf21ee0cc09813f8ef47d24911a228188b5280964695ee3d6da2d95",
+    "sha256:c9a26ed134abfa5c653a8baac74c0b622bc51ff3342e98ca7e5a0fdce5fa2fc9",
+    "sha256:bf3e8d68603db6804d495a914a7025d4be92958e71229b96f020fc0f78ac39c0",
+    "sha256:bbb7edfaa8fae52b29c32687a1d9dd53c36f1be23cb2a214e7a299801f24ab91",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:ba7090d7bc82e86aaa1b82ad851b6a984e2ce352c70f595520e425d228b2a631",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:35b519c8d1bed80a6c3d8624ce7e98eb6e180d6f05fe51baca1e3d08b0fc1758",
+    "sha256:997a58812fcc53d28324adb1c408235bf2f2dd582e199d93cf8042d95086fded",
+    "sha256:ab9ebfc4cfbf0b77cf95ccb734ba156eeabdcea60a7aba0a05d72553b4692322",
+    "sha256:9ffd22085305ee02c6085360c37d6491fcf2c2fdf1ac4fc9d10c2f48599bd48a",
+    "sha256:1d76a3e1f67bcbef2ed45b42828dd0bdb873290038177f3c33132d16af28ca0c",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:8bd2dbe637582c9e80004fbe71f117c8ad3514d45182d45e2164054cb9126544",
+    "sha256:ce4fbcb6655d5884c729c66d7ec449fdb9c06970d54ec156767b4b6f29f61905",
+    "sha256:e8d5deccef349057f7a7b3fd22bf7a2a1106518e63ac3f23e596e07ecc807a69",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+  ],
+  "rootfs_type": "layers",
+  "schema": "layersentry.oci-image-inspection/v1"
+}

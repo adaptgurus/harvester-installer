@@ -1022,7 +1022,74 @@
   ],
   "generated_at": "2026-09-01T12:38:02Z",
   "lock_status": "incomplete",
-  "packages": [],
+  "packages": [
+    {
+      "id": "harvester-base-os-dracut",
+      "sha256": "c8bfc0a4a3be8e9641277141f361cf1759939dbdefe1c5d4a96b3a56c36fd8b6",
+      "source": "oci-file://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#/usr/bin/dracut",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-elemental",
+      "sha256": "11bace099491ab30db4374e266ccee241e5909ad9d5ecf302f510e93611bbec2",
+      "source": "oci-file://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#/usr/bin/elemental",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-firmware-inventory",
+      "sha256": "daaeab97924dc16bcd3c4ee7d78a07634e9e3277891acae5007732031b91b133",
+      "source": "oci-tree://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#/usr/lib/firmware",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-initrd",
+      "sha256": "acba7a18774433dc06045c2ae3fe92ac479f4e54393c797d035f33eae3e14f20",
+      "source": "oci-file://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#/boot/initrd-6.12.0-160000.36-default",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-kernel",
+      "sha256": "f22a1b67275adc5fff5659924ac690b51afabddaeb220db6fe05b76551aab072",
+      "source": "oci-file://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#/usr/lib/modules/6.12.0-160000.36-default/vmlinuz",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-oci-manifest",
+      "sha256": "d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+      "source": "oci://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-package-repositories",
+      "sha256": "00d1d23a0b16e7ef9c7180bd966a5e151da1fbc2273182092c5d98672ba26364",
+      "source": "oci-tree://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#/etc/zypp/repos.d",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-release-metadata",
+      "sha256": "cf3e229d7a2bc9906f2ce5140cfda0673883e8d55ff6187cb6021f1e03ec9dc3",
+      "source": "oci-file://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#/etc/os-release",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-rootfs-layer-set",
+      "sha256": "7aa6d90bf39cd443cd7e8d82e1aa38b6ce0b512989bcb164463bd0b9954cf533",
+      "source": "oci-metadata://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#rootfs-layers",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "harvester-base-os-rpm-inventory",
+      "sha256": "d5f473ecd5b50b472f40abc58dd727d579742d574cb4ea79c3a53830206bbe37",
+      "source": "oci-inventory://docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4#rpm-nevra",
+      "version": "v1.8-20260806-linux-amd64"
+    },
+    {
+      "id": "layersentry-harvester-os-overlay",
+      "sha256": "5323dae498fee4725e8e182a2a523c931ddc00bed06e4130a3bc1356caf9c892",
+      "source": "git+https://github.com/adaptgurus/harvester-installer.git@04fc143b0807bfe8b219349e3420dba534f8efde#harvester-os-overlay-tree-cf40fd571a80900725b4feffb9d2f3aed9801afb",
+      "version": "git-04fc143b0807"
+    }
+  ],
   "policy": {
     "forbid_branch_git_refs": true,
     "forbid_floating_chart_versions": true,
@@ -1074,6 +1141,18 @@
     "review_report": "provenance/reviews/4d144ceaa429d66afdfed43ed5988d53f9e6f76c/external-image-review.json",
     "source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c",
     "status": "external-inputs-reviewed-lock-still-incomplete"
+  },
+  "reviewed_os_package_inputs": {
+    "base_os_alias": "docker.io/rancher/harvester-os:v1.8-20260806",
+    "base_os_ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+    "candidate_sha256": "6c28867d702b42b32f523dc828426e58eb232de0dc72ec1a6d977a876efab279",
+    "firmware_record_count": 5196,
+    "overlay_tree": "cf40fd571a80900725b4feffb9d2f3aed9801afb",
+    "package_input_count": 11,
+    "plan_sha256": "7421ab3e1224abde41883f9d7bfcd47ef33a25aa5e421f27af818c78f9f8f403",
+    "rpm_package_count": 507,
+    "source_commit": "04fc143b0807bfe8b219349e3420dba534f8efde",
+    "status": "os-package-inputs-reviewed-lock-still-incomplete"
   },
   "reviewed_syft_tool": {
     "archive_sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
@@ -1169,11 +1248,6 @@
       "required_resolution": "External registry aliases are digest-locked. Capture and verify locally generated harvester-cluster-repo, installer and OS image identities in the deterministic build evidence, then prove final ISO image-list coverage.",
       "review_report": "provenance/reviews/4d144ceaa429d66afdfed43ed5988d53f9e6f76c/external-image-review.json",
       "reviewed_discovery_source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c"
-    },
-    {
-      "id": "harvester-os-and-package-inputs",
-      "kind": "package-set",
-      "required_resolution": "Enumerate the OS/rootfs/kernel/firmware/package inputs with source and SHA-256 checksums."
     },
     {
       "id": "build-toolchain",
