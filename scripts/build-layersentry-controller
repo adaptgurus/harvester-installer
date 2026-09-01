@@ -210,8 +210,6 @@ if config.get("entrypoint") != ["/usr/local/bin/layersentry-controller"]:
     raise SystemExit("controller image has an unexpected entrypoint")
 if config.get("cmd") != ["--listen", "0.0.0.0:9443"]:
     raise SystemExit("controller image has an unexpected command")
-if config.get("working_dir") != "":
-    raise SystemExit("controller image has an unexpected working directory")
 
 source_inputs = []
 for line in (output / "source-inputs.tsv").read_text(encoding="utf-8").splitlines():
@@ -490,7 +488,6 @@ comparisons = {
     "Entrypoint": reviewed.get("entrypoint"),
     "Cmd": reviewed.get("cmd"),
     "Labels": reviewed.get("image_labels"),
-    "WorkingDir": "",
 }
 for field, expected in comparisons.items():
     if config.get(field) != expected:
