@@ -1,0 +1,297 @@
+name: LayerSentry v1.0 generated offline image-set lock
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - package/harvester-repo/Dockerfile
+      - scripts/provenance/collect_offline_image_set_evidence.sh
+      - scripts/provenance/review_offline_image_set.py
+      - scripts/provenance/verify_offline_image_set_binding.py
+      - scripts/provenance/prepare_finalizer_iso_evidence.sh
+      - tests/test_offline_image_set_lock.py
+      - .github/workflows/layersentry-v1.0-offline-image-set-lock.yml
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: layersentry-v1.0-offline-image-set-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Build, lock and publish the complete dependency-set ISO candidate
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+      BASE_OS_REF: docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4
+      DRONE_TAG: v1.0
+      DRONE_BRANCH: layersentry-v1.0-dev
+      DISABLE_BUILD_NET_INSTALL_ISO: "true"
+      BUILD_QCOW: "false"
+      SYFT_CHECK_FOR_APP_UPDATE: "false"
+      LAYERSENTRY_BUILDER_PULL: always
+    steps:
+      - name: Checkout exact finalizer source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Run fail-closed finalizer preflight
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          source_date_epoch=$(git show -s --format=%ct HEAD)
+          [[ "$source_date_epoch" =~ ^[1-9][0-9]*$ ]]
+          echo "SOURCE_DATE_EPOCH=$source_date_epoch" >> "$GITHUB_ENV"
+
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/offline-image-set-preflight-report.json"
+          python3 scripts/provenance/verify_builder_binding.py \
+            --lock "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report "$RUNNER_TEMP/offline-image-set-builder-binding.json"
+          python3 scripts/provenance/verify_controller_binding.py \
+            --lock "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report "$RUNNER_TEMP/offline-image-set-controller-binding.json"
+          python3 - "$LOCK_FILE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          unresolved = [
+              item.get("id")
+              for item in lock.get("unresolved", [])
+              if isinstance(item, dict) and item.get("id")
+          ]
+          if lock.get("lock_status") != "incomplete":
+              raise SystemExit("finalizer requires an incomplete dependency lock")
+          if unresolved != ["harvester-offline-image-set"]:
+              raise SystemExit(
+                  "finalizer requires exactly harvester-offline-image-set unresolved; "
+                  f"found {unresolved}"
+              )
+          forbidden_ids = {
+              "layersentry-generated-harvester-cluster-repo",
+              "layersentry-generated-harvester-installer",
+              "layersentry-generated-harvester-os",
+          }
+          existing = {
+              item.get("id")
+              for item in lock.get("container_images", [])
+              if isinstance(item, dict)
+          }
+          if existing & forbidden_ids:
+              raise SystemExit("one or more generated images are already locked")
+          PY
+
+          bash -n \
+            scripts/provenance/collect_offline_image_set_evidence.sh \
+            scripts/provenance/prepare_finalizer_iso_evidence.sh
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover \
+            -s tests -p 'test_offline_image_set_lock.py' -v
+
+          expected_base='FROM registry.suse.com/bci/bci-base@sha256:ad95af6d4b236fa9854b30fc156984456c83dc7dd51684e200844e721861f542'
+          test "$(head -n 1 package/harvester-repo/Dockerfile)" = "$expected_base"
+          df -h
+          docker version
+
+      - name: Log in to GHCR for locked builder and generated images
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          auth_dir="$GITHUB_WORKSPACE/.offline-image-set-auth"
+          rm -rf "$auth_dir"
+          mkdir -p "$auth_dir"
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker --config "$auth_dir" login ghcr.io \
+                -u "$GITHUB_ACTOR" --password-stdin
+          echo "AUTH_DIR=$auth_dir" >> "$GITHUB_ENV"
+
+      - name: Build the full offline ISO and three local images in locked builder
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          candidate_dir="$GITHUB_WORKSPACE/.offline-image-set-candidate/${GITHUB_SHA}-${GITHUB_RUN_ID}"
+          release_dir="$GITHUB_WORKSPACE/.finalizer-release"
+          rm -rf "$candidate_dir" "$release_dir"
+          mkdir -p "$candidate_dir" "$release_dir"
+          scripts/provenance/run_locked_builder.sh bash -lc '
+            set -Eeuo pipefail
+            export DOCKER_CONFIG="$GITHUB_WORKSPACE/.offline-image-set-auth"
+            docker pull --platform linux/amd64 "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4" >/dev/null
+            ./scripts/default
+            bash scripts/prepare-production-iso-evidence.sh \
+              dist/artifacts \
+              "$GITHUB_WORKSPACE/.finalizer-release"
+          '
+          echo "CANDIDATE_DIR=$candidate_dir" >> "$GITHUB_ENV"
+          echo "RELEASE_DIR=$release_dir" >> "$GITHUB_ENV"
+
+      - name: Restore tracked source and collect immutable generated-image evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git reset --hard "$GITHUB_SHA"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          scripts/provenance/run_locked_builder.sh bash -lc '
+            set -Eeuo pipefail
+            export DOCKER_CONFIG="$GITHUB_WORKSPACE/.offline-image-set-auth"
+            bash scripts/provenance/collect_offline_image_set_evidence.sh \
+              "$GITHUB_WORKSPACE/.offline-image-set-candidate/$GITHUB_SHA-$GITHUB_RUN_ID" \
+              "$GITHUB_SHA" \
+              "$GITHUB_RUN_ID"
+          '
+
+      - name: Review image evidence and complete only the dependency lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          review_dir="provenance/offline-image-sets/${GITHUB_SHA}-${GITHUB_RUN_ID}"
+          rm -rf "$review_dir"
+          mkdir -p "$review_dir/images"
+          cp \
+            "$CANDIDATE_DIR/offline-image-set-candidate.json" \
+            "$CANDIDATE_DIR/image-lists-manifest.json" \
+            "$CANDIDATE_DIR/iso-metadata.json" \
+            "$CANDIDATE_DIR/source-inputs.tsv" \
+            "$CANDIDATE_DIR/STATUS.md" \
+            "$review_dir/"
+          cp "$CANDIDATE_DIR"/images/*.json "$review_dir/images/"
+          (
+            cd "$review_dir"
+            find . -type f ! -name committed-evidence.sha256 -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > committed-evidence.sha256
+            sha256sum -c committed-evidence.sha256
+          )
+
+          python3 scripts/provenance/review_offline_image_set.py \
+            --candidate "$CANDIDATE_DIR/offline-image-set-candidate.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --build-run-id "$GITHUB_RUN_ID" \
+            --report "$review_dir/review-dry-run.json"
+          python3 scripts/provenance/review_offline_image_set.py \
+            --candidate "$CANDIDATE_DIR/offline-image-set-candidate.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --build-run-id "$GITHUB_RUN_ID" \
+            --report "$review_dir/review-applied.json" \
+            --apply
+
+          python3 scripts/provenance/verify_image_coverage.py \
+            "$LOCK_FILE" "$CANDIDATE_DIR/image-lists" \
+            --report "$review_dir/image-digest-coverage-report.json"
+          python3 scripts/provenance/verify_offline_image_set_binding.py \
+            --lock "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report "$review_dir/offline-image-set-binding-report.json"
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --require-complete \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scan-build-inputs \
+            --report "$review_dir/completed-provenance-report.json"
+          echo "REVIEW_DIR=$review_dir" >> "$GITHUB_ENV"
+
+      - name: Commit the completed dependency lock locally
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$LOCK_FILE" "$REVIEW_DIR"
+          test -n "$(git diff --cached --name-only)"
+          unexpected=$(
+            git diff --cached --name-only \
+              | grep -Ev "^(${LOCK_FILE}|${REVIEW_DIR}/)" \
+              || true
+          )
+          test -z "$unexpected"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git commit -m "chore(provenance): complete Harvester offline image-set lock"
+          provenance_commit=$(git rev-parse HEAD)
+          [[ "$provenance_commit" =~ ^[0-9a-f]{40}$ ]]
+          test -z "$(git status --porcelain --untracked-files=no)"
+          echo "PROVENANCE_COMMIT=$provenance_commit" >> "$GITHUB_ENV"
+
+      - name: Finalize ISO evidence against completed lock commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          GITHUB_SHA="$PROVENANCE_COMMIT" \
+            scripts/provenance/run_locked_builder.sh --no-daemon \
+              bash scripts/provenance/prepare_finalizer_iso_evidence.sh \
+              .finalizer-release \
+              ".offline-image-set-candidate/${{ github.sha }}-$GITHUB_RUN_ID" \
+              "$LOCK_FILE" \
+              "${{ github.sha }}" \
+              "$PROVENANCE_COMMIT"
+
+      - name: Upload complete dependency-lock and build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-complete-build-evidence-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            ${{ env.RELEASE_DIR }}/**
+            !${{ env.RELEASE_DIR }}/*.iso
+            ${{ env.REVIEW_DIR }}/**
+            ${{ env.LOCK_FILE }}
+            ${{ runner.temp }}/offline-image-set-preflight-report.json
+            ${{ runner.temp }}/offline-image-set-builder-binding.json
+            ${{ runner.temp }}/offline-image-set-controller-binding.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
+
+      - name: Upload non-promoted complete-lock ISO candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-harvester-v1.8.2-amd64-offline-${{ github.sha }}
+          path: |
+            ${{ env.RELEASE_DIR }}/layersentry-v1.0-harvester-v1.8.2-amd64.iso
+            ${{ env.RELEASE_DIR }}/layersentry-v1.0-harvester-v1.8.2-amd64.iso.sha512
+            ${{ env.RELEASE_DIR }}/layersentry-v1.0-harvester-v1.8.2-amd64.iso.bytes
+            ${{ env.RELEASE_DIR }}/artifact-digests.json
+            ${{ env.RELEASE_DIR }}/resolved-provenance.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Push completed dependency lock only after artifacts succeed
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$PROVENANCE_COMMIT"
+          remote_head=$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | awk '{print $1}')
+          test "$remote_head" = "$GITHUB_SHA"
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+
+      - name: Remove transient registry credentials
+        if: always()
+        shell: bash
+        run: |
+          rm -rf \
+            "$GITHUB_WORKSPACE/.offline-image-set-auth" \
+            "$GITHUB_WORKSPACE/.offline-image-set-candidate"
+          docker logout ghcr.io >/dev/null 2>&1 || true

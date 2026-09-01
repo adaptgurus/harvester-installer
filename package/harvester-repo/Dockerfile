@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/bci-base:16.0
+FROM registry.suse.com/bci/bci-base@sha256:ad95af6d4b236fa9854b30fc156984456c83dc7dd51684e200844e721861f542
 
 RUN zypper -n rm container-suseconnect && \
     zypper -n in nginx && \

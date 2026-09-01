@@ -1,13 +1,10 @@
 name: LayerSentry v1.0 provenance gate (Harvester v1.8.2 embedded)
 
 on:
-  workflow_dispatch:
-  pull_request:
-    branches:
-      - layersentry-v1.0-dev
   push:
     branches:
       - layersentry-v1.0-dev
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,17 +15,18 @@ concurrency:
 
 jobs:
   provenance:
-    name: Fast fail-closed provenance validation
-    runs-on: [self-hosted, linux, x64, layersentry-provenance-v1]
+    name: Require complete immutable dependency lock
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Checkout exact event source
+      - name: Checkout exact source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate immutable dependency lock and build paths
+      - name: Validate complete lock, source ancestry and build paths
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -39,11 +37,11 @@ jobs:
             --scan-build-inputs \
             --report provenance-gate-report.json
 
-      - name: Upload gate report
+      - name: Upload provenance report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: layersentry-v1.0-provenance-gate-${{ github.run_id }}-${{ github.run_attempt }}
+          name: layersentry-v1.0-provenance-${{ github.run_id }}-${{ github.run_attempt }}
           path: provenance-gate-report.json
           if-no-files-found: error
           retention-days: 90
