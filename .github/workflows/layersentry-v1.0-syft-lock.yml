@@ -1,0 +1,200 @@
+name: LayerSentry v1.0 checksum-locked Syft review
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-syft-lock.yml
+      - .github/workflows/layersentry-v1.0-full-offline-iso.yml
+      - provenance/layersentry-v1.0-syft-tool.json
+      - scripts/provenance/install_locked_syft.sh
+      - scripts/provenance/review_syft_tool.py
+      - scripts/provenance/verify_staged_syft.py
+      - scripts/provenance/prepare-release-evidence.sh
+      - tests/test_locked_syft.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layersentry-v1.0-syft-lock
+  cancel-in-progress: false
+
+env:
+  LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+  DESCRIPTOR_FILE: provenance/layersentry-v1.0-syft-tool.json
+  SYFT_CHECK_FOR_APP_UPDATE: "false"
+
+jobs:
+  validate-review-and-lock:
+    name: Validate exact Syft asset and retain incomplete provenance lock
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact Syft review source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fail fast on source, syntax, tests and structural policy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          bash -n scripts/provenance/install_locked_syft.sh
+          bash -n scripts/provenance/prepare-release-evidence.sh
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover -s tests -p 'test_locked_syft.py' -v
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/syft-lock-preflight-report.json"
+
+      - name: Download and validate exact immutable Syft release asset
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tools="$RUNNER_TEMP/layersentry-syft-bin"
+          runtime_evidence="$RUNNER_TEMP/layersentry-syft-runtime-evidence"
+          validation="$runtime_evidence/locked-tool-validation.json"
+          review_dir="provenance/tools/$GITHUB_SHA/syft"
+          rm -rf "$runtime_evidence" "$review_dir"
+          mkdir -p "$runtime_evidence" "$review_dir"
+          scripts/provenance/install_locked_syft.sh \
+            "$DESCRIPTOR_FILE" \
+            "$tools" \
+            "$validation" \
+            "$runtime_evidence"
+          cp "$validation" "$review_dir/locked-tool-validation.json"
+          cp "$runtime_evidence/syft-version.txt" "$review_dir/syft-version.txt"
+          cp "$runtime_evidence/evidence-files.sha256" "$review_dir/uploaded-artifact-files.sha256"
+          echo "SYFT_BIN=$tools/syft" >> "$GITHUB_ENV"
+          echo "SYFT_VALIDATION=$validation" >> "$GITHUB_ENV"
+          echo "SYFT_RUNTIME_EVIDENCE=$runtime_evidence" >> "$GITHUB_ENV"
+          echo "SYFT_REVIEW_DIR=$review_dir" >> "$GITHUB_ENV"
+
+      - name: Prove locked binary generates an SPDX JSON SBOM
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          fixture="$RUNNER_TEMP/layersentry-syft-smoke"
+          rm -rf "$fixture"
+          mkdir -p "$fixture"
+          cat > "$fixture/package.json" <<'JSON'
+          {
+            "name": "layersentry-syft-smoke",
+            "version": "1.0.0",
+            "license": "Apache-2.0"
+          }
+          JSON
+          "$SYFT_BIN" "$fixture" \
+            -o "spdx-json=$SYFT_REVIEW_DIR/syft-smoke.spdx.json"
+          python3 - "$SYFT_REVIEW_DIR/syft-smoke.spdx.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert str(document["spdxVersion"]).startswith("SPDX-")
+          assert isinstance(document["creationInfo"], dict)
+          assert isinstance(document["packages"], list)
+          PY
+
+      - name: Review and merge Syft evidence into incomplete lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/review_syft_tool.py \
+            --descriptor "$DESCRIPTOR_FILE" \
+            --validation "$SYFT_VALIDATION" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$SYFT_REVIEW_DIR/syft-lock-review-dry-run.json"
+          python3 scripts/provenance/review_syft_tool.py \
+            --descriptor "$DESCRIPTOR_FILE" \
+            --validation "$SYFT_VALIDATION" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$SYFT_REVIEW_DIR/syft-lock-review.json" \
+            --apply
+          python3 scripts/provenance/verify_staged_syft.py \
+            --lock "$LOCK_FILE" \
+            --binary "$SYFT_BIN" \
+            --report "$SYFT_REVIEW_DIR/staged-syft-verification.json"
+
+      - name: Revalidate lock remains fail-closed
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$SYFT_REVIEW_DIR/structural-lock-report.json"
+          python3 - "$LOCK_FILE" "$DESCRIPTOR_FILE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          descriptor = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          assert lock["lock_status"] == "incomplete"
+          unresolved = {item["id"] for item in lock["unresolved"]}
+          assert len(unresolved) == 5
+          assert "syft-sbom-generator" not in unresolved
+          assert "harvester-offline-image-set" in unresolved
+          assert "harvester-os-and-package-inputs" in unresolved
+          assert "build-toolchain" in unresolved
+          entries = [
+              item
+              for item in lock["toolchain_artifacts"]
+              if item["id"] == descriptor["id"]
+          ]
+          assert len(entries) == 1
+          entry = entries[0]
+          assert entry["version"] == descriptor["version"]
+          assert entry["source"] == descriptor["source"]
+          assert entry["sha256"] == descriptor["sha256"]
+          assert len(entry["binary_sha256"]) == 64
+          assert entry["binary_bytes"] > 0
+          PY
+          (
+            cd "$SYFT_REVIEW_DIR"
+            find . -maxdepth 1 -type f ! -name review-files.sha256 -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > review-files.sha256
+            sha256sum -c review-files.sha256
+          )
+
+      - name: Upload exact Syft asset and review evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-locked-syft-${{ github.sha }}
+          path: |
+            ${{ env.SYFT_RUNTIME_EVIDENCE }}/**
+            ${{ env.SYFT_REVIEW_DIR }}/**
+            ${{ runner.temp }}/syft-lock-preflight-report.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+      - name: Commit reviewed Syft lock without enabling ISO build
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --quiet origin layersentry-v1.0-dev
+          test "$(git rev-parse origin/layersentry-v1.0-dev)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$LOCK_FILE" "$SYFT_REVIEW_DIR"
+          test -n "$(git status --porcelain)"
+          git commit -m "chore(provenance): lock checksum-verified Syft v1.51.1 [skip ci]"
+          git push origin HEAD:refs/heads/layersentry-v1.0-dev
