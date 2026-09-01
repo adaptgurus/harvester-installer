@@ -19,9 +19,18 @@ concurrency:
 jobs:
   inventory:
     name: Inventory real Hyper-V host and existing LayerSentry VMs
-    runs-on: [self-hosted, Windows, X64, layersentry-hyperv]
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 20
     steps:
+      - name: Confirm Windows runner identity
+        shell: powershell
+        run: |
+          Write-Host "Runner name: $env:RUNNER_NAME"
+          Write-Host "Runner OS: $env:RUNNER_OS"
+          Write-Host "Runner architecture: $env:RUNNER_ARCH"
+          Write-Host "Computer: $env:COMPUTERNAME"
+          Write-Host "Identity: $([Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+
       - name: Checkout exact inventory source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
