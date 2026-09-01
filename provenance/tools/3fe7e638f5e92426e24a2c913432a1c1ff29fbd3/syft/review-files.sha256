@@ -1,0 +1,8 @@
+a3f97d8ac5beaf0e3b65748d6bb523a38c26085bef2609abb6ad036838d33913  ./locked-tool-validation.json
+095a9fc6e92afba274e4b2a8817f641f7a4285dca349312eed3c8d186eaffc25  ./staged-syft-verification.json
+26b8195477cf03250b146dfc69a96f9423d5469cf27fee0c805990d8e11e0177  ./structural-lock-report.json
+02ca04bcb74744218ba540ee16517eda81267af9ef6612cb293d77e44171dfc8  ./syft-lock-review-dry-run.json
+e40269b70ec7e075b5dfaf3bf4782ab63e395a8334e1cd1b358e9413a295433a  ./syft-lock-review.json
+97d164c65c146268db134e9751a44a397671e672883bf715f8d3034fc75fa370  ./syft-smoke.spdx.json
+d9fb5be8078be2ac21ff48110999fdffead8ce3a2c8e55ad4412fa878e65dc2e  ./syft-version.txt
+31e69167616343e5e1ed3d58f69139fe7fa5a3d5ad03e239090c8ef6500630e3  ./uploaded-artifact-files.sha256

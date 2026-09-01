@@ -1,0 +1,15 @@
+{
+  "archive_bytes": 29203595,
+  "archive_safety_verified": true,
+  "archive_sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+  "binary_bytes": 87220386,
+  "binary_sha256": "abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+  "descriptor_sha256": "2b980ef7cf2185b791e9d2be727caa49bec296e6e42f9ade62371d4ca76197cd",
+  "generated_at": "2026-09-01T16:50:14Z",
+  "id": "syft-linux-amd64",
+  "official_checksum_manifest_verified": true,
+  "schema": "layersentry.locked-tool-validation/v1",
+  "source": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz",
+  "version": "v1.51.1",
+  "version_verified": true
+}

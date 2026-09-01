@@ -1,0 +1,23 @@
+{
+  "applied": true,
+  "archive_sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+  "binary_sha256": "abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+  "descriptor_sha256": "2b980ef7cf2185b791e9d2be727caa49bec296e6e42f9ade62371d4ca76197cd",
+  "id": "syft-linux-amd64",
+  "lock_status": "incomplete",
+  "production_lock_complete": false,
+  "release_approved": false,
+  "remaining_unresolved_count": 5,
+  "remaining_unresolved_ids": [
+    "build-toolchain",
+    "harvester-offline-image-set",
+    "harvester-os-and-package-inputs",
+    "layersentry-controller-image",
+    "layersentry-full-offline-builder-image"
+  ],
+  "removed_unresolved_id": "syft-sbom-generator",
+  "schema": "layersentry.locked-tool-review/v1",
+  "source_commit": "3fe7e638f5e92426e24a2c913432a1c1ff29fbd3",
+  "validation_sha256": "a3f97d8ac5beaf0e3b65748d6bb523a38c26085bef2609abb6ad036838d33913",
+  "version": "v1.51.1"
+}

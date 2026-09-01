@@ -1075,6 +1075,16 @@
     "source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c",
     "status": "external-inputs-reviewed-lock-still-incomplete"
   },
+  "reviewed_syft_tool": {
+    "archive_sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+    "binary_sha256": "abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+    "descriptor_sha256": "2b980ef7cf2185b791e9d2be727caa49bec296e6e42f9ade62371d4ca76197cd",
+    "id": "syft-linux-amd64",
+    "source_commit": "3fe7e638f5e92426e24a2c913432a1c1ff29fbd3",
+    "status": "syft-reviewed-lock-still-incomplete",
+    "validation_sha256": "a3f97d8ac5beaf0e3b65748d6bb523a38c26085bef2609abb6ad036838d33913",
+    "version": "v1.51.1"
+  },
   "schema": "layersentry.provenance-lock/v1",
   "source_locks": [
     {
@@ -1104,6 +1114,30 @@
       "version": "v3.20.0"
     },
     {
+      "binary_bytes": 87220386,
+      "binary_sha256": "abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+      "bytes": 29203595,
+      "checksums_manifest": {
+        "asset_id": 532610246,
+        "bytes": 2690,
+        "sha256": "105346699e7cb694afa37a21e2386432df6278c99f71331c24b1e0bb0f38cc75",
+        "source": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_checksums.txt"
+      },
+      "id": "syft-linux-amd64",
+      "name": "syft",
+      "release": {
+        "asset_id": 532610151,
+        "immutable": true,
+        "published_at": "2026-08-27T17:01:15Z",
+        "release_id": 377988884,
+        "repository": "https://github.com/anchore/syft.git",
+        "tag": "v1.51.1"
+      },
+      "sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+      "source": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz",
+      "version": "v1.51.1"
+    },
+    {
       "id": "wharfie-amd64",
       "sha256": "e6b5d27e5b5815ece828e3d2f4012ccec1e40dceb4e639815d6cdbc0f22e2fa8",
       "source": "https://github.com/rancher/wharfie/releases/download/v0.6.8/wharfie-amd64",
@@ -1126,11 +1160,6 @@
       "id": "layersentry-full-offline-builder-image",
       "kind": "container-image",
       "required_resolution": "Record and use the exact builder image digest."
-    },
-    {
-      "id": "syft-sbom-generator",
-      "kind": "toolchain-artifact",
-      "required_resolution": "Pin either an OCI digest or a release asset URL plus SHA-256; never download from a latest-release endpoint."
     },
     {
       "external_registry_aliases_locked": 116,

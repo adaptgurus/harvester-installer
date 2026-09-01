@@ -1,0 +1,12 @@
+{
+  "archive_sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+  "binary_bytes": 87220386,
+  "binary_path": "/home/runner/work/_temp/layersentry-syft-bin/syft",
+  "binary_sha256": "abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+  "id": "syft-linux-amd64",
+  "schema": "layersentry.staged-tool-verification/v1",
+  "source": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz",
+  "verified": true,
+  "version": "v1.51.1",
+  "version_output": "Application:   syft\nVersion:       1.51.1\nBuildDate:     2026-08-27T16:55:02Z\nGitCommit:     91a0032987d91b7411b52f6f5c185c5e7f775495\nGitDescription: v1.51.1\nPlatform:      linux/amd64\nGoVersion:     go1.26.3\nCompiler:      gc\nSchemaVersion: 16.1.10"
+}
