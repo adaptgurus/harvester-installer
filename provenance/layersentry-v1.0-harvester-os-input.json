@@ -1,0 +1,47 @@
+{
+  "schema": "layersentry.os-package-input-plan/v1",
+  "release_identity": {
+    "product": "LayerSentry v1.0",
+    "embedded_platform": "Harvester v1.8.2"
+  },
+  "platform": "linux/amd64",
+  "architecture": "amd64",
+  "base_os_image": {
+    "id": "docker-io-rancher-harvester-os",
+    "alias": "docker.io/rancher/harvester-os:v1.8-20260806",
+    "ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+    "digest": "sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
+    "version": "v1.8-20260806"
+  },
+  "package_manager": "rpm",
+  "required_inputs": [
+    "oci-manifest",
+    "rootfs-layer-set",
+    "rpm-package-inventory",
+    "os-release",
+    "kernel",
+    "initrd",
+    "firmware-tree",
+    "package-repository-config",
+    "elemental-binary",
+    "dracut-binary",
+    "layersentry-os-overlay"
+  ],
+  "source_controlled_overlay": {
+    "repository": "https://github.com/adaptgurus/harvester-installer.git",
+    "paths": [
+      "package/harvester-os/Dockerfile",
+      "package/harvester-os/files",
+      "package/harvester-os/iso",
+      "package/harvester-os/manifest.yaml",
+      "package/harvester-os/templates",
+      "scripts/package-harvester-os"
+    ]
+  },
+  "locked_download": {
+    "id": "wharfie-amd64",
+    "version": "v0.6.8",
+    "source": "https://github.com/rancher/wharfie/releases/download/v0.6.8/wharfie-amd64",
+    "sha256": "e6b5d27e5b5815ece828e3d2f4012ccec1e40dceb4e639815d6cdbc0f22e2fa8"
+  }
+}
