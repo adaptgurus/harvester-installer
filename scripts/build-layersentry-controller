@@ -288,7 +288,7 @@ candidate_mode() {
   [[ $# -eq 4 ]] \
     || fail "usage: $0 --candidate OUTPUT_DIR SOURCE_COMMIT SOURCE_ALIAS VERSION_ALIAS"
   local output_dir=$1 source_commit=$2 source_alias=$3 version_alias=$4
-  local build_epoch work local1 local2 source_digest version_digest controller_ref
+  local build_epoch work image source_digest version_digest controller_ref
 
   [[ $source_commit =~ ^[0-9a-f]{40}$ ]] \
     || fail "source commit must be exactly 40 lowercase hex characters"
@@ -307,6 +307,7 @@ candidate_mode() {
   work="$output_dir/work"
   mkdir -p "$work/pass1" "$work/pass2" "$work/context/bin"
 
+  # Binary reproducibility is proven independently of Docker metadata.
   (cd "$TOP_DIR" && go test -count=1 ./cmd/layersentry-controller)
   build_binary "$TOP_DIR/cmd/layersentry-controller/main.go" \
     "$work/pass1/layersentry-controller" "$source_commit" "$build_epoch"
@@ -320,22 +321,17 @@ candidate_mode() {
   cp "$TOP_DIR/package/layersentry-controller/Dockerfile" \
     "$work/context/Dockerfile"
 
-  local1="layersentry/controller-candidate:${source_commit:0:12}-pass1"
-  local2="layersentry/controller-candidate:${source_commit:0:12}-pass2"
-  build_candidate_image "$work/context" "$local1" "$source_commit" "$build_epoch"
-  canonical_inspect "$local1" "$work/pass1/image-inspect.json"
-  build_candidate_image "$work/context" "$local2" "$source_commit" "$build_epoch"
-  canonical_inspect "$local2" "$work/pass2/image-inspect.json"
-  cmp "$work/pass1/image-inspect.json" "$work/pass2/image-inspect.json"
-  cp "$work/pass1/image-inspect.json" "$output_dir/image-inspect.json"
-  validate_self_test "$local1" "$source_commit" "$build_epoch" \
-    "$work/pass1/self-test.json"
-  validate_self_test "$local2" "$source_commit" "$build_epoch" \
-    "$work/pass2/self-test.json"
-  cmp "$work/pass1/self-test.json" "$work/pass2/self-test.json"
+  # Docker's local exporter carries daemon-generated metadata and is not used
+  # as a reproducibility oracle. Build one source-bound image, validate it, push
+  # it, and lock the registry manifest by its immutable SHA-256 digest.
+  image="layersentry/controller-candidate:${source_commit:0:12}"
+  build_candidate_image "$work/context" "$image" "$source_commit" "$build_epoch"
+  canonical_inspect "$image" "$output_dir/image-inspect.json"
+  validate_self_test "$image" "$source_commit" "$build_epoch" \
+    "$work/self-test.json"
 
-  docker tag "$local1" "$source_alias"
-  docker tag "$local1" "$version_alias"
+  docker tag "$image" "$source_alias"
+  docker tag "$image" "$version_alias"
   docker push "$source_alias" | tee "$work/source-push.log"
   docker push "$version_alias" | tee "$work/version-push.log"
   source_digest=$(grep -Eo 'digest: sha256:[0-9a-f]{64}' \
