@@ -188,6 +188,27 @@ class CandidateTests(unittest.TestCase):
             self.assertTrue(candidate["all_inputs_verified"])
             self.assertFalse(candidate["release_approved"])
 
+    def test_accepts_boot_symlinks_resolved_into_usr_lib_modules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidence = self.fixture(root)
+            boot = evidence / "boot-files.tsv"
+            text = boot.read_text(encoding="utf-8")
+            text = text.replace(
+                "/boot/vmlinuz-1", "/usr/lib/modules/6.12.0-default/vmlinuz"
+            ).replace(
+                "/boot/initrd-1", "/usr/lib/modules/6.12.0-default/initrd"
+            )
+            boot.write_text(text, encoding="utf-8")
+            candidate = candidate_builder.build_candidate(
+                PLAN_PATH, evidence, "5" * 40, "6" * 40
+            )
+            by_id = {item["id"]: item for item in candidate["packages"]}
+            self.assertIn(
+                "/usr/lib/modules/6.12.0-default/vmlinuz",
+                by_id["harvester-base-os-kernel"]["source"],
+            )
+
     def test_rejects_kernel_digest_drift(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

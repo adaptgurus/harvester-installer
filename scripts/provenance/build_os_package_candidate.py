@@ -164,8 +164,12 @@ def build_candidate(
     for item_id, row in boot_by_id.items():
         require_positive_int(row["bytes"], f"{item_id} byte count")
         require_sha(row["sha256"], f"{item_id} SHA-256")
-        if not row["resolved_path"].startswith("/boot/"):
-            raise CandidateError(f"{item_id} resolved path is outside /boot")
+        allowed_boot_prefixes = ("/boot/", "/usr/lib/modules/")
+        if not row["resolved_path"].startswith(allowed_boot_prefixes):
+            raise CandidateError(
+                f"{item_id} resolved path is outside the approved kernel trees: "
+                f"{row['resolved_path']!r}"
+            )
 
     firmware_path = evidence_dir / "firmware-files.tsv"
     firmware_rows = read_tsv(
