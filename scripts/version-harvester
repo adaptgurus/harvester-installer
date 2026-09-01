@@ -1,7 +1,86 @@
 #!/bin/bash
 
-HARVESTER_VERSION=$(cd $1; source ./scripts/version &> /dev/null; echo $VERSION)
-HARVESTER_APP_VERSION=$(cd $1; source ./scripts/version &> /dev/null; echo $APP_VERSION)
-HARVESTER_CHART_VERSION=$(cd $1; source ./scripts/version &> /dev/null; echo $CHART_VERSION)
-HARVESTER_KUBEVIRT_VERSION=$(yq e '.kubevirt-operator.containers.operator.image.tag' $1/deploy/charts/harvester/values.yaml)
-HARVESTER_MIN_UPGRADABLE_VERSION=$(cd $1; source ./scripts/version &> /dev/null; echo $MIN_UPGRADABLE_VERSION)
+_harvester_version_fail() {
+    echo "Harvester release binding error: $*" >&2
+    return 1
+}
+
+_harvester_repo=${1:?source scripts/version-harvester HARVESTER_REPOSITORY_PATH}
+_harvester_expected_ref=${HARVESTER_RELEASE_REF:-v1.8.2}
+_harvester_expected_commit=${HARVESTER_RELEASE_COMMIT:-5320dfa6770f63406750e7c64b24ed87c543e6ad}
+
+if [[ ! "${_harvester_expected_ref}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
+    _harvester_version_fail "invalid immutable release label ${_harvester_expected_ref}" || return 1
+fi
+if [[ ! "${_harvester_expected_commit}" =~ ^[0-9a-f]{40}$ ]]; then
+    _harvester_version_fail "expected commit must be exactly 40 lowercase hex characters" || return 1
+fi
+if [ ! -d "${_harvester_repo}/.git" ]; then
+    _harvester_version_fail "${_harvester_repo} is not a Git work tree" || return 1
+fi
+
+_harvester_actual_commit=$(git -C "${_harvester_repo}" rev-parse HEAD 2>/dev/null) || {
+    _harvester_version_fail "cannot resolve repository HEAD" || return 1
+}
+if [ "${_harvester_actual_commit}" != "${_harvester_expected_commit}" ]; then
+    _harvester_version_fail \
+        "HEAD ${_harvester_actual_commit} does not equal ${_harvester_expected_ref} commit ${_harvester_expected_commit}" \
+        || return 1
+fi
+
+# A commit-only shallow fetch does not create the release tag locally. Fetch the
+# single expected tag only when it is absent or points elsewhere, then prove the
+# tag resolves to the already pinned commit. This preserves offline reuse when a
+# verified local source cache already contains the tag.
+_harvester_tag_commit=$(
+    git -C "${_harvester_repo}" rev-parse "refs/tags/${_harvester_expected_ref}^{commit}" 2>/dev/null || true
+)
+if [ "${_harvester_tag_commit}" != "${_harvester_expected_commit}" ]; then
+    git -C "${_harvester_repo}" fetch --quiet --depth 1 origin \
+        "+refs/tags/${_harvester_expected_ref}:refs/tags/${_harvester_expected_ref}" || {
+        _harvester_version_fail "cannot fetch exact release tag ${_harvester_expected_ref}" || return 1
+    }
+    _harvester_tag_commit=$(
+        git -C "${_harvester_repo}" rev-parse "refs/tags/${_harvester_expected_ref}^{commit}" 2>/dev/null
+    ) || {
+        _harvester_version_fail "cannot resolve fetched release tag ${_harvester_expected_ref}" || return 1
+    }
+fi
+if [ "${_harvester_tag_commit}" != "${_harvester_expected_commit}" ]; then
+    _harvester_version_fail \
+        "tag ${_harvester_expected_ref} resolves to ${_harvester_tag_commit}, expected ${_harvester_expected_commit}" \
+        || return 1
+fi
+
+if [ -n "$(git -C "${_harvester_repo}" status --porcelain --untracked-files=no)" ]; then
+    _harvester_version_fail "locked Harvester source has tracked modifications" || return 1
+fi
+
+HARVESTER_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${VERSION}")
+HARVESTER_APP_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${APP_VERSION}")
+HARVESTER_CHART_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${CHART_VERSION}")
+HARVESTER_KUBEVIRT_VERSION=$(yq e '.kubevirt-operator.containers.operator.image.tag' "${_harvester_repo}/deploy/charts/harvester/values.yaml")
+HARVESTER_MIN_UPGRADABLE_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${MIN_UPGRADABLE_VERSION}")
+
+if [ "${HARVESTER_VERSION}" != "${_harvester_expected_ref}" ]; then
+    _harvester_version_fail \
+        "upstream version resolver produced ${HARVESTER_VERSION}, expected ${_harvester_expected_ref}" \
+        || return 1
+fi
+if [ "${HARVESTER_APP_VERSION}" != "${_harvester_expected_ref}" ]; then
+    _harvester_version_fail \
+        "upstream appVersion resolver produced ${HARVESTER_APP_VERSION}, expected ${_harvester_expected_ref}" \
+        || return 1
+fi
+if [ "${HARVESTER_CHART_VERSION}" != "${_harvester_expected_ref#v}" ]; then
+    _harvester_version_fail \
+        "upstream chart resolver produced ${HARVESTER_CHART_VERSION}, expected ${_harvester_expected_ref#v}" \
+        || return 1
+fi
+if [[ "${HARVESTER_VERSION} ${HARVESTER_APP_VERSION} ${HARVESTER_CHART_VERSION}" =~ (^|[-[:space:]])head($|[-[:space:]]) ]]; then
+    _harvester_version_fail "head-derived release identity is forbidden" || return 1
+fi
+
+unset _harvester_repo _harvester_expected_ref _harvester_expected_commit
+unset _harvester_actual_commit _harvester_tag_commit
+unset -f _harvester_version_fail

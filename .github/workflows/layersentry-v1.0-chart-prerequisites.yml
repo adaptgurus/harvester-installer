@@ -1,0 +1,91 @@
+name: LayerSentry v1.0 chart provenance prerequisites
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-chart-prerequisites.yml
+      - scripts/version-harvester
+      - scripts/default
+      - scripts/provenance/normalize_chart_archives.py
+      - tests/test_harvester_version_binding.py
+      - tests/test_normalize_chart_archives.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layersentry-v1.0-chart-prerequisites-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Prove release binding and deterministic chart archives
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact prerequisite source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run syntax and unit validation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n scripts/version-harvester
+          bash -n scripts/default
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover -s tests -p 'test_harvester_version_binding.py' -v
+          python3 -m unittest discover -s tests -p 'test_normalize_chart_archives.py' -v
+
+      - name: Prove real Harvester release tag binds to pinned commit
+        shell: bash
+        env:
+          HARVESTER_RELEASE_REF: v1.8.2
+          HARVESTER_RELEASE_COMMIT: 5320dfa6770f63406750e7c64b24ed87c543e6ad
+          YQ_VERSION: v4.52.5
+          YQ_SHA256: 75d893a0d5940d1019cb7cdc60001d9e876623852c31cfc6267047bc31149fa9
+        run: |
+          set -Eeuo pipefail
+          tools="$RUNNER_TEMP/layersentry-tools"
+          source_dir="$RUNNER_TEMP/harvester-commit-only"
+          mkdir -p "$tools" "$source_dir"
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors \
+            "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/yq_linux_amd64" \
+            -o "$tools/yq"
+          echo "$YQ_SHA256  $tools/yq" | sha256sum -c -
+          chmod +x "$tools/yq"
+          export PATH="$tools:$PATH"
+          export ARCH=amd64
+
+          git -C "$source_dir" init -q
+          git -C "$source_dir" remote add origin https://github.com/harvester/harvester.git
+          git -C "$source_dir" fetch --quiet --no-tags --depth 1 origin "$HARVESTER_RELEASE_COMMIT"
+          git -C "$source_dir" -c advice.detachedHead=false checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$source_dir" rev-parse HEAD)" = "$HARVESTER_RELEASE_COMMIT"
+          test -z "$(git -C "$source_dir" tag -l "$HARVESTER_RELEASE_REF")"
+
+          source scripts/version-harvester "$source_dir"
+          test "$HARVESTER_VERSION" = "$HARVESTER_RELEASE_REF"
+          test "$HARVESTER_APP_VERSION" = "$HARVESTER_RELEASE_REF"
+          test "$HARVESTER_CHART_VERSION" = "${HARVESTER_RELEASE_REF#v}"
+          test "$(git -C "$source_dir" rev-parse "refs/tags/$HARVESTER_RELEASE_REF^{commit}")" = "$HARVESTER_RELEASE_COMMIT"
+          [[ ! "$HARVESTER_VERSION $HARVESTER_APP_VERSION $HARVESTER_CHART_VERSION" =~ head ]]
+
+      - name: Revalidate structural provenance policy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+          python3 scripts/provenance/verify_lock.py \
+            provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/chart-prerequisite-provenance-report.json"

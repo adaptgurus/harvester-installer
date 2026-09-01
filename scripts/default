@@ -7,6 +7,10 @@ cd $(dirname $0)
 ./build
 ./test
 ./build-bundle
+python3 ./provenance/normalize_chart_archives.py \
+  ../package/harvester-repo/charts \
+  --report ../dist/chart-normalization-report.json
+helm repo index ../package/harvester-repo/charts
 ./package-harvester-repo
 ./package-harvester-installer
 ./package-harvester-os
