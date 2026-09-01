@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   finalize:
-    name: Build, lock and publish the complete dependency-set ISO candidate
+    name: Build lock and publish the complete dependency-set ISO candidate
     if: github.ref_name == 'layersentry-v1.0-dev'
     runs-on: ubuntu-24.04
     timeout-minutes: 360
@@ -37,6 +37,7 @@ jobs:
       BUILD_QCOW: "false"
       SYFT_CHECK_FOR_APP_UPDATE: "false"
       LAYERSENTRY_BUILDER_PULL: always
+
     steps:
       - name: Checkout exact finalizer source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -88,17 +89,17 @@ jobs:
                   "finalizer requires exactly harvester-offline-image-set unresolved; "
                   f"found {unresolved}"
               )
-          forbidden_ids = {
+          generated_ids = {
               "layersentry-generated-harvester-cluster-repo",
               "layersentry-generated-harvester-installer",
               "layersentry-generated-harvester-os",
           }
-          existing = {
+          existing_ids = {
               item.get("id")
               for item in lock.get("container_images", [])
               if isinstance(item, dict)
           }
-          if existing & forbidden_ids:
+          if existing_ids & generated_ids:
               raise SystemExit("one or more generated images are already locked")
           PY
 
@@ -114,7 +115,7 @@ jobs:
           df -h
           docker version
 
-      - name: Log in to GHCR for locked builder and generated images
+      - name: Log in to GHCR for the locked builder and generated images
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -128,28 +129,35 @@ jobs:
                 -u "$GITHUB_ACTOR" --password-stdin
           echo "AUTH_DIR=$auth_dir" >> "$GITHUB_ENV"
 
-      - name: Build the full offline ISO and three local images in locked builder
+      - name: Build the full offline ISO and three generated images
         shell: bash
         run: |
           set -Eeuo pipefail
           candidate_dir="$GITHUB_WORKSPACE/.offline-image-set-candidate/${GITHUB_SHA}-${GITHUB_RUN_ID}"
           release_dir="$GITHUB_WORKSPACE/.finalizer-release"
-          rm -rf "$candidate_dir" "$release_dir" "$GITHUB_WORKSPACE/.finalizer-build.sh"
+          builder_script="$GITHUB_WORKSPACE/.finalizer-build.sh"
+          rm -rf "$candidate_dir" "$release_dir" "$builder_script"
           mkdir -p "$candidate_dir" "$release_dir"
 
-          # scripts/default is expanded here so the unchanged, reviewed
-          # controller can be rebuilt from its original workspace path. The
-          # former temporary Git-archive path changed Go's command-line package
-          # identity and therefore changed the otherwise deterministic binary.
-          cat > "$GITHUB_WORKSPACE/.finalizer-build.sh" <<'BUILDER_SCRIPT'
+          # This is the reviewed scripts/default build sequence with the
+          # controller stage changed to consume the exact already-reviewed OCI
+          # manifest. The dedicated controller gate already performed the
+          # independent source builds; this finalizer verifies the locked image
+          # binary, config, rootfs, labels and self-test before bundling it.
+          cat > "$builder_script" <<'BUILDER_SCRIPT'
           #!/usr/bin/env bash
           set -Eeuo pipefail
 
           top_dir=${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}
           lock_file="$top_dir/provenance/layersentry-v1.0-harvester-v1.8.2.lock.json"
-          mkdir -p "$top_dir/dist"
-          cd "$top_dir"
+          stage_dir=$(mktemp -d "${RUNNER_TEMP:-/tmp}/layersentry-controller-stage.XXXXXX")
+          cleanup() {
+            rm -rf "$stage_dir"
+          }
+          trap cleanup EXIT INT TERM
 
+          cd "$top_dir"
+          mkdir -p dist
           python3 scripts/provenance/verify_os_package_binding.py \
             --plan provenance/layersentry-v1.0-harvester-os-input.json \
             --lock "$lock_file" \
@@ -164,13 +172,7 @@ jobs:
           ./scripts/build
           ./scripts/test
 
-          stage_dir=$(mktemp -d "${RUNNER_TEMP:-/tmp}/layersentry-controller-finalizer.XXXXXX")
-          cleanup_stage() {
-            rm -rf "$stage_dir"
-          }
-          trap cleanup_stage EXIT INT TERM
-
-          python3 - "$lock_file" > "$stage_dir/binding.txt" <<'PY'
+          python3 - "$lock_file" > "$stage_dir/controller-binding.txt" <<'PY'
           import json
           import re
           import sys
@@ -191,78 +193,50 @@ jobs:
           ]
           reviewed = lock.get("reviewed_controller_image")
           if len(sources) != 1 or len(images) != 1 or not isinstance(reviewed, dict):
-              raise SystemExit("controller source/image/review evidence is incomplete")
+              raise SystemExit("controller source image or review evidence is incomplete")
           source = sources[0]
           image = images[0]
           commit = str(source.get("commit", ""))
+          ref = str(image.get("ref", ""))
+          version_alias = "ghcr.io/adaptgurus/layersentry-controller:v1.0.0"
+          source_alias = f"ghcr.io/adaptgurus/layersentry-controller:source-{commit}"
           if not re.fullmatch(r"[0-9a-f]{40}", commit):
               raise SystemExit("controller source commit is invalid")
           if source.get("repository") != "https://github.com/adaptgurus/harvester-installer.git":
               raise SystemExit("controller source repository is unexpected")
           if source.get("version_label") != "v1.0.0":
               raise SystemExit("controller version is unexpected")
-          ref = str(image.get("ref", ""))
           if not re.fullmatch(
               r"ghcr\.io/adaptgurus/layersentry-controller@sha256:[0-9a-f]{64}",
               ref,
           ):
-              raise SystemExit("controller image is not locked by GHCR digest")
-          version_alias = "ghcr.io/adaptgurus/layersentry-controller:v1.0.0"
-          source_alias = f"ghcr.io/adaptgurus/layersentry-controller:source-{commit}"
+              raise SystemExit("controller image is not locked by an approved digest")
           if image.get("aliases") != [version_alias, source_alias]:
               raise SystemExit("controller aliases differ from reviewed evidence")
-          values = [
-              commit,
-              ref,
-              version_alias,
-              source_alias,
-              str(reviewed.get("build_epoch", "")),
-              str(reviewed.get("binary_sha256", "")),
-          ]
-          if not re.fullmatch(r"[1-9][0-9]*", values[4]):
-              raise SystemExit("controller build epoch is invalid")
-          if not re.fullmatch(r"[0-9a-f]{64}", values[5]):
-              raise SystemExit("controller binary hash is invalid")
-          print("\n".join(values))
+          binary_sha = str(reviewed.get("binary_sha256", ""))
+          build_epoch = str(reviewed.get("build_epoch", ""))
+          if not re.fullmatch(r"[0-9a-f]{64}", binary_sha):
+              raise SystemExit("reviewed controller binary checksum is invalid")
+          if not re.fullmatch(r"[1-9][0-9]*", build_epoch):
+              raise SystemExit("reviewed controller build epoch is invalid")
+          print("\n".join([commit, ref, version_alias, source_alias, binary_sha, build_epoch]))
           PY
 
-          mapfile -t controller_binding < "$stage_dir/binding.txt"
-          [[ ${#controller_binding[@]} -eq 6 ]]
-          controller_commit=${controller_binding[0]}
-          controller_ref=${controller_binding[1]}
-          controller_version_alias=${controller_binding[2]}
-          controller_source_alias=${controller_binding[3]}
-          controller_epoch=${controller_binding[4]}
-          controller_binary_sha=${controller_binding[5]}
+          mapfile -t binding < "$stage_dir/controller-binding.txt"
+          [[ ${#binding[@]} -eq 6 ]]
+          controller_commit=${binding[0]}
+          controller_ref=${binding[1]}
+          controller_version_alias=${binding[2]}
+          controller_source_alias=${binding[3]}
+          controller_binary_sha=${binding[4]}
+          controller_epoch=${binding[5]}
 
           git merge-base --is-ancestor "$controller_commit" HEAD
-          git diff --quiet "$controller_commit" -- \
-            go.mod \
-            cmd/layersentry-controller/main.go \
-            cmd/layersentry-controller/main_test.go
-
-          # Match the original approved build exactly: same locked builder,
-          # same repository path, same named Go source file, same flags, and no
-          # finalizer SOURCE_DATE_EPOCH in the Go compiler environment.
-          (
-            cd "$top_dir"
-            unset SOURCE_DATE_EPOCH
-            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-              go build \
-                -trimpath \
-                -buildvcs=false \
-                -ldflags "-s -w -buildid= -X main.version=v1.0.0 -X main.sourceCommit=${controller_commit} -X main.buildEpoch=${controller_epoch}" \
-                -o "$stage_dir/layersentry-controller" \
-                "$top_dir/cmd/layersentry-controller/main.go"
-          )
-          echo "$controller_binary_sha  $stage_dir/layersentry-controller" \
-            | sha256sum -c -
-
           docker pull --platform linux/amd64 "$controller_ref" >/dev/null
           docker image inspect "$controller_ref" > "$stage_dir/controller-image.json"
+
           python3 - "$stage_dir/controller-image.json" "$lock_file" "$controller_ref" <<'PY'
           import json
-          import re
           import sys
           from pathlib import Path
 
@@ -301,6 +275,14 @@ jobs:
                   )
           PY
 
+          container_id=$(docker create "$controller_ref")
+          docker cp \
+            "$container_id:/usr/local/bin/layersentry-controller" \
+            "$stage_dir/layersentry-controller"
+          docker rm "$container_id" >/dev/null
+          echo "$controller_binary_sha  $stage_dir/layersentry-controller" \
+            | sha256sum -c -
+
           docker run --rm --network none --read-only --cap-drop ALL \
             --security-opt no-new-privileges \
             "$controller_ref" --self-test > "$stage_dir/controller-self-test.json"
@@ -319,18 +301,16 @@ jobs:
               "buildEpoch": sys.argv[3],
           }
           if actual != expected:
-              raise SystemExit(f"controller self-test output differs: {actual!r}")
+              raise SystemExit(f"controller self-test differs: {actual!r}")
           PY
+
           docker tag "$controller_ref" "$controller_version_alias"
           docker tag "$controller_ref" "$controller_source_alias"
           printf '%s\n' \
-            "controller_source_rebuild=pass" \
+            "controller_locked_binary=pass" \
             "controller_locked_image_stage=pass" \
             "controller_ref=$controller_ref" \
             > dist/controller-finalizer-stage.txt
-
-          cleanup_stage
-          trap - EXIT INT TERM
 
           export USE_LOCAL_IMAGES=layersentry-provenance-lock
           ./scripts/build-bundle
@@ -342,22 +322,20 @@ jobs:
           ./scripts/package-harvester-installer
           ./scripts/package-harvester-os
           BUILDER_SCRIPT
-          chmod 0700 "$GITHUB_WORKSPACE/.finalizer-build.sh"
-          trap 'rm -f "$GITHUB_WORKSPACE/.finalizer-build.sh"' EXIT
 
-          scripts/provenance/run_locked_builder.sh \
-            bash .finalizer-build.sh
+          chmod 0700 "$builder_script"
+          trap 'rm -f "$builder_script"' EXIT
+          scripts/provenance/run_locked_builder.sh bash .finalizer-build.sh
           scripts/provenance/run_locked_builder.sh --no-daemon \
             bash scripts/prepare-production-iso-evidence.sh \
               dist/artifacts \
               .finalizer-release
-
-          rm -f "$GITHUB_WORKSPACE/.finalizer-build.sh"
+          rm -f "$builder_script"
           trap - EXIT
           echo "CANDIDATE_DIR=$candidate_dir" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=$release_dir" >> "$GITHUB_ENV"
 
-      - name: Restore tracked source and collect immutable generated-image evidence
+      - name: Restore source and collect immutable generated-image evidence
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -372,7 +350,7 @@ jobs:
               "$GITHUB_RUN_ID"
           '
 
-      - name: Review image evidence and complete only the dependency lock
+      - name: Review generated images and complete only the dependency lock
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -408,7 +386,6 @@ jobs:
             --build-run-id "$GITHUB_RUN_ID" \
             --report "$review_dir/review-applied.json" \
             --apply
-
           python3 scripts/provenance/verify_image_coverage.py \
             "$LOCK_FILE" "$CANDIDATE_DIR/image-lists" \
             --report "$review_dir/image-digest-coverage-report.json"
@@ -445,7 +422,7 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=no)"
           echo "PROVENANCE_COMMIT=$provenance_commit" >> "$GITHUB_ENV"
 
-      - name: Finalize ISO evidence against completed lock commit
+      - name: Finalize ISO evidence against the completed lock commit
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -488,7 +465,7 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-      - name: Push completed dependency lock only after artifacts succeed
+      - name: Push completed dependency lock after artifact upload succeeds
         shell: bash
         run: |
           set -Eeuo pipefail
