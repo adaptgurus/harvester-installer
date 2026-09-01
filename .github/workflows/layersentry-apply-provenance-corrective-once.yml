@@ -1,0 +1,121 @@
+name: Apply LayerSentry provenance corrective overlay once
+
+on:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-apply-provenance-corrective-once.yml
+      - .github/automation/layersentry-provenance-corrective-patch-v2.zip.part-*
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layersentry-provenance-corrective-once
+  cancel-in-progress: false
+
+jobs:
+  apply-validate-and-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact trigger commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconstruct and verify corrective package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git switch -C layersentry-v1.0-dev "$GITHUB_SHA"
+          cat .github/automation/layersentry-provenance-corrective-patch-v2.zip.part-* > /tmp/layersentry-provenance-corrective-patch-v2.zip
+          echo 'e299c9ee072b6e9888920d9a3ac3540f4a56a7a3b89bdf3ed5bb2160837e41fa  /tmp/layersentry-provenance-corrective-patch-v2.zip' | sha256sum -c -
+          rm -rf /tmp/layersentry-provenance-corrective-patch-v2
+          mkdir -p /tmp/layersentry-provenance-corrective-patch-v2
+          unzip -q /tmp/layersentry-provenance-corrective-patch-v2.zip -d /tmp/layersentry-provenance-corrective-patch-v2
+          package=/tmp/layersentry-provenance-corrective-patch-v2/layersentry-provenance-corrective-patch-v2
+          test -f "$package/apply-corrective-patch.py"
+          (cd "$package" && sha256sum -c PATCH-MANIFEST.sha256)
+          echo "PACKAGE=$package" >> "$GITHUB_ENV"
+
+      - name: Apply fail-closed provenance overlay
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 "$PACKAGE/apply-corrective-patch.py" --repo "$GITHUB_WORKSPACE"
+          python3 "$PACKAGE/apply-corrective-patch.py" --repo "$GITHUB_WORKSPACE" --apply
+          chmod +x \
+            scripts/provenance/normalize_image_list.py \
+            scripts/provenance/prepare-release-evidence.sh \
+            scripts/provenance/resolve_image_digests.py \
+            scripts/provenance/verify_image_coverage.py \
+            scripts/provenance/verify_lock.py
+
+      - name: Remove one-time transport files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -f .github/workflows/layersentry-apply-provenance-corrective-once.yml
+          rm -f .github/automation/layersentry-provenance-corrective-patch-v2.zip.part-*
+          rmdir .github/automation 2>/dev/null || true
+
+      - name: Validate final repository tree
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+
+          bash -n scripts/lib/addon
+          bash -n scripts/build
+          bash -n scripts/build-bundle
+          bash -n scripts/package-harvester-os
+          bash -n scripts/prepare-production-iso-evidence.sh
+          bash -n scripts/provenance/prepare-release-evidence.sh
+
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+          for workflow in \
+            layersentry-production-bootstrap.yml \
+            layersentry-production-iso.yml \
+            layersentry-build-evidence.yml; do
+            test ! -e ".github/workflows/$workflow"
+            test -f ".github/workflows-disabled/pre-provenance-v1.8.2/$workflow"
+          done
+
+          python3 scripts/provenance/verify_lock.py \
+            provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+            --repo-root . \
+            --scan-build-inputs \
+            --report /tmp/provenance-structural-report.json
+
+          set +e
+          python3 scripts/provenance/verify_lock.py \
+            provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+            --require-complete \
+            --repo-root . \
+            --scan-build-inputs \
+            --report /tmp/provenance-production-gate-report.json \
+            >/tmp/provenance-production-gate-output.txt 2>&1
+          gate_rc=$?
+          set -e
+          test "$gate_rc" -ne 0
+          grep -F 'provenance lock is not complete; the full-offline build remains blocked' /tmp/provenance-production-gate-output.txt
+          grep -F 'provenance lock has 9 unresolved input(s)' /tmp/provenance-production-gate-output.txt
+
+          test ! -e .github/workflows/layersentry-apply-provenance-corrective-once.yml
+          ! find .github -type f -name 'layersentry-provenance-corrective-patch-v2.zip.part-*' | grep -q .
+
+      - name: Commit validated corrective baseline
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          test -n "$(git status --porcelain)"
+          git commit -m 'ci(provenance): add fail-closed LayerSentry v1.0 release gate [skip ci]'
+          git push origin HEAD:refs/heads/layersentry-v1.0-dev
