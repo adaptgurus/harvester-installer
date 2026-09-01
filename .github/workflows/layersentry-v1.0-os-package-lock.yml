@@ -9,7 +9,7 @@ on:
       - .github/workflows/layersentry-v1.0-os-package-lock.yml
       - provenance/layersentry-v1.0-harvester-os-input.json
       - scripts/default
-      - scripts/package-harvester-os
+      - scripts/package-harvester-*
       - scripts/provenance/collect_os_package_evidence.sh
       - scripts/provenance/build_os_package_candidate.py
       - scripts/provenance/review_os_package_discovery.py
@@ -50,6 +50,14 @@ jobs:
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          # Run the repository-wide gate before any line that invokes or even
+          # names an expensive build script. This keeps gate-order validation
+          # unambiguous and prevents future preflight drift.
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/os-package-lock-preflight.json"
           bash -n scripts/default
           bash -n scripts/package-harvester-os
           bash -n scripts/provenance/collect_os_package_evidence.sh
@@ -60,11 +68,6 @@ jobs:
             --lock "$LOCK_FILE" \
             --repo-root . \
             --report "$RUNNER_TEMP/os-package-binding-preflight.json"
-          python3 scripts/provenance/verify_lock.py \
-            "$LOCK_FILE" \
-            --repo-root . \
-            --scan-build-inputs \
-            --report "$RUNNER_TEMP/os-package-lock-preflight.json"
 
       - name: Build two independent deterministic OS/package evidence passes
         shell: bash
