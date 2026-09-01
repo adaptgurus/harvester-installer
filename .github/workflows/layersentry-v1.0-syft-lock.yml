@@ -63,9 +63,9 @@ jobs:
           set -Eeuo pipefail
           tools="$RUNNER_TEMP/layersentry-syft-bin"
           runtime_evidence="$RUNNER_TEMP/layersentry-syft-runtime-evidence"
-          validation="$runtime_evidence/locked-tool-validation.json"
+          validation="$RUNNER_TEMP/layersentry-syft-validation.json"
           review_dir="provenance/tools/$GITHUB_SHA/syft"
-          rm -rf "$runtime_evidence" "$review_dir"
+          rm -rf "$runtime_evidence" "$review_dir" "$validation"
           mkdir -p "$runtime_evidence" "$review_dir"
           scripts/provenance/install_locked_syft.sh \
             "$DESCRIPTOR_FILE" \
