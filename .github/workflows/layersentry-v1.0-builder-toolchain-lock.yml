@@ -1,0 +1,354 @@
+name: LayerSentry v1.0 immutable builder and build-toolchain lock
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - Dockerfile.dapper
+      - scripts/test
+      - scripts/provenance/collect_builder_toolchain_evidence.sh
+      - scripts/provenance/locked_builder_entrypoint.sh
+      - scripts/provenance/run_locked_builder.sh
+      - scripts/provenance/review_builder_toolchain.py
+      - scripts/provenance/verify_builder_binding.py
+      - tests/test_builder_toolchain_lock.py
+      - .github/workflows/layersentry-v1.0-builder-toolchain-lock.yml
+      - .github/workflows/layersentry-v1.0-full-offline-iso.yml
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: layersentry-v1.0-builder-toolchain-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lock-builder:
+    name: Build, inspect and lock the immutable full-offline builder
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+      BUILDER_REPOSITORY: ghcr.io/adaptgurus/layersentry-full-offline-builder
+      DOCKER_BUILDKIT: "1"
+      SYFT_CHECK_FOR_APP_UPDATE: "false"
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Run fail-closed source and lock preflight
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/builder-lock-preflight-report.json"
+
+          bash -n \
+            scripts/test \
+            scripts/provenance/collect_builder_toolchain_evidence.sh \
+            scripts/provenance/locked_builder_entrypoint.sh \
+            scripts/provenance/run_locked_builder.sh
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover \
+            -s tests -p 'test_builder_toolchain_lock.py' -v
+
+          python3 - "$LOCK_FILE" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          unresolved = {
+              item.get("id")
+              for item in lock.get("unresolved", [])
+              if isinstance(item, dict)
+          }
+          required = {
+              "layersentry-full-offline-builder-image",
+              "build-toolchain",
+          }
+          if not required.issubset(unresolved):
+              raise SystemExit(
+                  "builder/toolchain unresolved markers are not both present; "
+                  "refusing to rebuild or replace an established lock"
+              )
+
+          dockerfile = Path("Dockerfile.dapper").read_text(encoding="utf-8")
+          expected_base = (
+              "FROM registry.suse.com/bci/golang@sha256:"
+              "fa2dced84848f4e961e22f2b7d353d5df29fccba96c7b68c56b1bf495ac5dea1"
+          )
+          if dockerfile.splitlines()[0] != expected_base:
+              raise SystemExit("Dockerfile.dapper base image is not the approved digest")
+          for forbidden in (
+              "DAPPER_DOCKER_SOCKET",
+              "/run/containerd/containerd.sock",
+              "zypper addrepo",
+              "download.opensuse.org",
+          ):
+              if forbidden.lower() in dockerfile.lower():
+                  raise SystemExit(f"forbidden mutable/host-runtime input remains: {forbidden}")
+
+          test_script = Path("scripts/test").read_text(encoding="utf-8")
+          exact_addons = "f60d73d894e00f18d5e11cd21a301ed1b016631c"
+          if exact_addons not in test_script or "${ADDONS_COMMIT}" not in test_script:
+              raise SystemExit("scripts/test is not bound to the exact add-ons commit")
+          if re.search(r"load_and_source_addon[^\n]+\bv1\.8\b", test_script):
+              raise SystemExit("scripts/test still uses the mutable add-ons v1.8 branch")
+          PY
+
+      - name: Log in to GitHub Container Registry
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push source-bound builder image
+        id: builder
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          builder_alias="${BUILDER_REPOSITORY}:source-${GITHUB_SHA}"
+          docker build --pull --no-cache --platform linux/amd64 \
+            --build-arg DAPPER_HOST_ARCH=amd64 \
+            --build-arg LAYERSENTRY_BUILDER_SOURCE="$GITHUB_SHA" \
+            -f Dockerfile.dapper \
+            -t "$builder_alias" \
+            .
+          docker push "$builder_alias"
+
+          builder_ref=$(
+            docker image inspect "$builder_alias" \
+              --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+              | grep -E "^${BUILDER_REPOSITORY}@sha256:[0-9a-f]{64}$" \
+              | head -n 1
+          )
+          [[ "$builder_ref" =~ ^ghcr\.io/adaptgurus/layersentry-full-offline-builder@sha256:[0-9a-f]{64}$ ]]
+          echo "BUILDER_ALIAS=$builder_alias" >> "$GITHUB_ENV"
+          echo "BUILDER_REF=$builder_ref" >> "$GITHUB_ENV"
+          echo "alias=$builder_alias" >> "$GITHUB_OUTPUT"
+          echo "ref=$builder_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Collect builder and toolchain evidence twice
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pass1="$RUNNER_TEMP/builder-toolchain-pass-1"
+          pass2="$RUNNER_TEMP/builder-toolchain-pass-2"
+          scripts/provenance/collect_builder_toolchain_evidence.sh \
+            "$pass1" "$BUILDER_REF" "$BUILDER_ALIAS" "$GITHUB_SHA"
+          scripts/provenance/collect_builder_toolchain_evidence.sh \
+            "$pass2" "$BUILDER_REF" "$BUILDER_ALIAS" "$GITHUB_SHA"
+
+          for evidence in \
+            image-inspect.json \
+            rpm-packages.tsv \
+            toolchain.json \
+            source-inputs.tsv \
+            builder-toolchain-candidate.json \
+            STATUS.md \
+            evidence-files.sha256; do
+            cmp "$pass1/$evidence" "$pass2/$evidence"
+          done
+          echo "BUILDER_PASS1=$pass1" >> "$GITHUB_ENV"
+          echo "BUILDER_PASS2=$pass2" >> "$GITHUB_ENV"
+
+      - name: Prove the builder uses an internal Docker daemon
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          smoke="$RUNNER_TEMP/layersentry-builder-smoke"
+          rm -rf "$smoke"
+          mkdir -p "$smoke"
+          cat > "$smoke/Dockerfile" <<'EOF'
+          FROM scratch
+          LABEL io.layersentry.builder-smoke="pass"
+          EOF
+
+          volume="layersentry-builder-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'docker volume rm -f "$volume" >/dev/null 2>&1 || true' EXIT
+          docker run --rm --privileged --platform linux/amd64 \
+            -e LAYERSENTRY_WORKSPACE=/smoke \
+            -e LAYERSENTRY_START_DOCKER_DAEMON=true \
+            -e LAYERSENTRY_DOCKER_STORAGE_DRIVER=overlay2 \
+            -e LAYERSENTRY_HOST_UID=0 \
+            -e LAYERSENTRY_HOST_GID=0 \
+            -v "$smoke:/smoke:ro" \
+            -v "$volume:/var/lib/docker" \
+            -w /smoke \
+            "$BUILDER_REF" \
+            bash -lc '
+              set -Eeuo pipefail
+              test -S /var/run/docker.sock
+              docker info --format "{{.Driver}}" | grep -Fx overlay2
+              docker build --network=none --no-cache \
+                -t layersentry/builder-smoke:verified /smoke
+              docker image inspect layersentry/builder-smoke:verified \
+                --format "{{index .Config.Labels \"io.layersentry.builder-smoke\"}}" \
+                | grep -Fx pass
+            '
+          printf '%s\n' "internal-docker-daemon-smoke=pass" \
+            > "$BUILDER_PASS1/internal-daemon-smoke.txt"
+
+      - name: Generate and validate builder SBOM
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sbom="$BUILDER_PASS1/builder-sbom.spdx.json"
+          docker run --rm --network none --platform linux/amd64 \
+            --entrypoint /usr/local/bin/syft \
+            -e SYFT_CHECK_FOR_APP_UPDATE=false \
+            "$BUILDER_REF" \
+            dir:/ -o spdx-json > "$sbom"
+          test -s "$sbom"
+
+          python3 - "$sbom" "$BUILDER_REF" "$GITHUB_SHA" \
+            "$BUILDER_PASS1/builder-sbom-evidence.json" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          sbom_path = Path(sys.argv[1])
+          builder_ref, source_commit, output = sys.argv[2:]
+          document = json.loads(sbom_path.read_text(encoding="utf-8"))
+          if not str(document.get("spdxVersion", "")).startswith("SPDX-"):
+              raise SystemExit("builder SBOM has no valid SPDX version")
+          packages = document.get("packages")
+          if not isinstance(packages, list) or len(packages) < 50:
+              raise SystemExit("builder SBOM package inventory is unexpectedly small")
+          raw = sbom_path.read_bytes()
+          evidence = {
+              "schema": "layersentry.builder-sbom-evidence/v1",
+              "builder_ref": builder_ref,
+              "source_commit": source_commit,
+              "format": "SPDX JSON",
+              "file": sbom_path.name,
+              "sha256": hashlib.sha256(raw).hexdigest(),
+              "bytes": len(raw),
+              "package_count": len(packages),
+              "release_approved": False,
+          }
+          Path(output).write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          (
+            cd "$BUILDER_PASS1"
+            find . -maxdepth 1 -type f ! -name evidence-files.sha256 -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > evidence-files.sha256
+            sha256sum -c evidence-files.sha256
+          )
+
+      - name: Review evidence and merge only builder/toolchain locks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          review_dir="provenance/builders/${GITHUB_SHA}"
+          rm -rf "$review_dir"
+          mkdir -p "$review_dir"
+          cp "$BUILDER_PASS1"/* "$review_dir/"
+
+          python3 scripts/provenance/review_builder_toolchain.py \
+            --candidate "$review_dir/builder-toolchain-candidate.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$review_dir/review-dry-run.json"
+
+          python3 scripts/provenance/review_builder_toolchain.py \
+            --candidate "$review_dir/builder-toolchain-candidate.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$review_dir/review-applied.json" \
+            --apply
+
+          echo "REVIEW_DIR=$review_dir" >> "$GITHUB_ENV"
+
+      - name: Revalidate merged lock and production path
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/verify_builder_binding.py \
+            --lock "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --report "$REVIEW_DIR/builder-binding-verification.json"
+
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scan-build-inputs \
+            --report "$REVIEW_DIR/post-merge-provenance-report.json"
+
+          python3 - "$LOCK_FILE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if lock.get("lock_status") != "incomplete":
+              raise SystemExit("builder review must not complete the production lock")
+          unresolved = sorted(
+              item.get("id")
+              for item in lock.get("unresolved", [])
+              if isinstance(item, dict) and item.get("id")
+          )
+          expected = [
+              "harvester-offline-image-set",
+              "layersentry-controller-image",
+          ]
+          if unresolved != expected:
+              raise SystemExit(
+                  f"unexpected remaining unresolved groups: {unresolved}; expected {expected}"
+              )
+          PY
+
+      - name: Upload auditable builder/toolchain evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-builder-toolchain-${{ github.sha }}
+          path: |
+            ${{ env.REVIEW_DIR }}/**
+            ${{ env.LOCK_FILE }}
+            ${{ runner.temp }}/builder-lock-preflight-report.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
+
+      - name: Commit reviewed evidence while retaining incomplete lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$LOCK_FILE" "$REVIEW_DIR"
+          test -n "$(git diff --cached --name-only)"
+
+          unexpected=$(
+            git diff --cached --name-only \
+              | grep -Ev "^(${LOCK_FILE}|${REVIEW_DIR}/)" \
+              || true
+          )
+          test -z "$unexpected"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git commit -m "chore(provenance): lock immutable builder and toolchain [skip ci]"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
