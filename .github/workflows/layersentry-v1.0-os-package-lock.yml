@@ -1,0 +1,253 @@
+name: LayerSentry v1.0 Harvester OS and package lock
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-os-package-lock.yml
+      - provenance/layersentry-v1.0-harvester-os-input.json
+      - scripts/default
+      - scripts/package-harvester-os
+      - scripts/provenance/collect_os_package_evidence.sh
+      - scripts/provenance/build_os_package_candidate.py
+      - scripts/provenance/review_os_package_discovery.py
+      - scripts/provenance/verify_os_package_binding.py
+      - tests/test_os_package_lock.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layersentry-v1.0-os-package-lock
+  cancel-in-progress: false
+
+env:
+  LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+  PLAN_FILE: provenance/layersentry-v1.0-harvester-os-input.json
+  BASE_OS_REF: docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4
+  SYFT_DESCRIPTOR: provenance/layersentry-v1.0-syft-tool.json
+  SYFT_CHECK_FOR_APP_UPDATE: "false"
+
+jobs:
+  discover-review-and-lock:
+    name: Prove exact OS, rootfs, kernel, firmware and package inputs
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout exact OS/package review source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fail fast on source, syntax, tests and structural policy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          bash -n scripts/default
+          bash -n scripts/package-harvester-os
+          bash -n scripts/provenance/collect_os_package_evidence.sh
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover -s tests -p 'test_os_package_lock.py' -v
+          python3 scripts/provenance/verify_os_package_binding.py \
+            --plan "$PLAN_FILE" \
+            --lock "$LOCK_FILE" \
+            --repo-root . \
+            --report "$RUNNER_TEMP/os-package-binding-preflight.json"
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/os-package-lock-preflight.json"
+
+      - name: Build two independent deterministic OS/package evidence passes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pass1="$RUNNER_TEMP/os-package-pass-1"
+          pass2="$RUNNER_TEMP/os-package-pass-2"
+          scripts/provenance/collect_os_package_evidence.sh "$pass1" "$GITHUB_SHA"
+          scripts/provenance/collect_os_package_evidence.sh "$pass2" "$GITHUB_SHA"
+          echo "OS_PASS1=$pass1" >> "$GITHUB_ENV"
+          echo "OS_PASS2=$pass2" >> "$GITHUB_ENV"
+
+      - name: Prove byte-for-byte deterministic inventories
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for evidence in \
+            image-inspect.json \
+            rpm-packages.tsv \
+            os-release \
+            boot-files.tsv \
+            firmware-files.tsv \
+            package-repositories.tsv \
+            os-tools.tsv \
+            layersentry-os-overlay.tar.gz \
+            os-package-input-candidate.json \
+            STATUS.md \
+            evidence-files.sha256; do
+            cmp "$OS_PASS1/$evidence" "$OS_PASS2/$evidence"
+          done
+
+      - name: Generate package SBOM with locked Syft
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tools="$RUNNER_TEMP/layersentry-os-syft-bin"
+          syft_evidence="$RUNNER_TEMP/layersentry-os-syft-evidence"
+          syft_validation="$RUNNER_TEMP/layersentry-os-syft-validation.json"
+          mkdir -p "$syft_evidence"
+          scripts/provenance/install_locked_syft.sh \
+            "$SYFT_DESCRIPTOR" \
+            "$tools" \
+            "$syft_validation" \
+            "$syft_evidence"
+          "$tools/syft" "docker:$BASE_OS_REF" \
+            -o "spdx-json=$OS_PASS1/base-os-sbom.spdx.json"
+          python3 - \
+            "$OS_PASS1/base-os-sbom.spdx.json" \
+            "$syft_validation" \
+            "$OS_PASS1/base-os-sbom-evidence.json" \
+            "$BASE_OS_REF" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          sbom_path = Path(sys.argv[1])
+          validation = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          output_path = Path(sys.argv[3])
+          base_os_ref = sys.argv[4]
+          sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
+          if not str(sbom.get("spdxVersion", "")).startswith("SPDX-"):
+              raise SystemExit("base OS SBOM is not SPDX JSON")
+          packages = sbom.get("packages")
+          if not isinstance(packages, list) or len(packages) < 50:
+              raise SystemExit(f"base OS SBOM package inventory is unexpectedly small: {len(packages or [])}")
+          digest = hashlib.sha256(sbom_path.read_bytes()).hexdigest()
+          report = {
+              "schema": "layersentry.os-package-sbom-evidence/v1",
+              "source": "docker:" + base_os_ref,
+              "format": "SPDX JSON",
+              "sha256": digest,
+              "bytes": sbom_path.stat().st_size,
+              "package_count": len(packages),
+              "generator": {
+                  "id": validation["id"],
+                  "version": validation["version"],
+                  "archive_sha256": validation["archive_sha256"],
+                  "binary_sha256": validation["binary_sha256"],
+              },
+              "release_approved": False,
+          }
+          output_path.write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+          echo "OS_SYFT_EVIDENCE=$syft_evidence" >> "$GITHUB_ENV"
+
+      - name: Review and merge OS/package inputs into incomplete lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          review_dir="provenance/os-packages/$GITHUB_SHA"
+          rm -rf "$review_dir"
+          mkdir -p "$review_dir"
+          cp \
+            "$OS_PASS1/STATUS.md" \
+            "$OS_PASS1/image-inspect.json" \
+            "$OS_PASS1/os-package-input-candidate.json" \
+            "$OS_PASS1/base-os-sbom-evidence.json" \
+            "$OS_PASS1/evidence-files.sha256" \
+            "$review_dir/"
+          python3 scripts/provenance/review_os_package_discovery.py \
+            --candidate "$OS_PASS1/os-package-input-candidate.json" \
+            --plan "$PLAN_FILE" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$review_dir/os-package-lock-review-dry-run.json"
+          python3 scripts/provenance/review_os_package_discovery.py \
+            --candidate "$OS_PASS1/os-package-input-candidate.json" \
+            --plan "$PLAN_FILE" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$review_dir/os-package-lock-review.json" \
+            --apply
+          echo "OS_REVIEW_DIR=$review_dir" >> "$GITHUB_ENV"
+
+      - name: Revalidate incomplete lock and exact build binding
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+          python3 scripts/provenance/verify_os_package_binding.py \
+            --plan "$PLAN_FILE" \
+            --lock "$LOCK_FILE" \
+            --repo-root . \
+            --report "$OS_REVIEW_DIR/os-package-binding-report.json"
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$OS_REVIEW_DIR/structural-lock-report.json"
+          python3 - "$LOCK_FILE" "$OS_PASS1/os-package-input-candidate.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          candidate = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          assert lock["lock_status"] == "incomplete"
+          unresolved = {item["id"] for item in lock["unresolved"]}
+          assert len(unresolved) == 4
+          assert "harvester-os-and-package-inputs" not in unresolved
+          assert "layersentry-controller-image" in unresolved
+          assert "layersentry-full-offline-builder-image" in unresolved
+          assert "harvester-offline-image-set" in unresolved
+          assert "build-toolchain" in unresolved
+          expected = {item["id"] for item in candidate["packages"]}
+          actual = {item["id"] for item in lock["packages"]}
+          assert expected.issubset(actual)
+          assert len(expected) == 11
+          PY
+          (
+            cd "$OS_REVIEW_DIR"
+            find . -maxdepth 1 -type f ! -name review-files.sha256 -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > review-files.sha256
+            sha256sum -c review-files.sha256
+          )
+
+      - name: Upload complete OS/package discovery evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-harvester-os-package-lock-${{ github.sha }}
+          path: |
+            ${{ env.OS_PASS1 }}/**
+            ${{ env.OS_REVIEW_DIR }}/**
+            ${{ env.OS_SYFT_EVIDENCE }}/**
+            ${{ runner.temp }}/os-package-binding-preflight.json
+            ${{ runner.temp }}/os-package-lock-preflight.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
+
+      - name: Commit reviewed OS/package lock without enabling ISO build
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --quiet origin layersentry-v1.0-dev
+          test "$(git rev-parse origin/layersentry-v1.0-dev)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$LOCK_FILE" "$OS_REVIEW_DIR"
+          test -n "$(git status --porcelain)"
+          git commit -m "chore(provenance): lock Harvester OS and package inputs [skip ci]"
+          git push origin HEAD:refs/heads/layersentry-v1.0-dev
