@@ -1,0 +1,23 @@
+{
+  "bytes": 29203595,
+  "checksums_manifest": {
+    "asset_id": 532610246,
+    "bytes": 2690,
+    "sha256": "105346699e7cb694afa37a21e2386432df6278c99f71331c24b1e0bb0f38cc75",
+    "source": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_checksums.txt"
+  },
+  "id": "syft-linux-amd64",
+  "name": "syft",
+  "release": {
+    "asset_id": 532610151,
+    "immutable": true,
+    "published_at": "2026-08-27T17:01:15Z",
+    "release_id": 377988884,
+    "repository": "https://github.com/anchore/syft.git",
+    "tag": "v1.51.1"
+  },
+  "schema": "layersentry.locked-tool/v1",
+  "sha256": "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+  "source": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz",
+  "version": "v1.51.1"
+}
