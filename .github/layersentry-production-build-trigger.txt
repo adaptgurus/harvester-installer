@@ -2,6 +2,10 @@ LayerSentry production ISO build trigger
 Date: 2026-09-01
 Product: LayerSentry 1.0
 Harvester base: v1.8.2
+Harvester source commit: 5320dfa6770f63406750e7c64b24ed87c543e6ad
+Harvester addons source commit: f60d73d894e00f18d5e11cd21a301ed1b016631c
 Validated full-offline source baseline: 49e533b1afbaaa08f0611090a4c09f2a6c6098ed
+Source pin fix commit: 64f4f687244033520f3b2e78286ca6b3144293e3
 Build policy: full offline ISO only; no net-install ISO
 NTP policy: editable installer field; connected default may be replaced by customer-approved/local NTP
+Build request: provenance-fix-attempt-2
