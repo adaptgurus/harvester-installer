@@ -407,7 +407,7 @@ Exact ISO SHA-512: \`${actual_sha512}\`
 
 Capture state: **RUNTIME_BOOT_EVIDENCE_CAPTURED_REVIEW_REQUIRED**.
 
-This evidence does not establish installation, cluster readiness, air-gap operation, or release approval. Review the staged screenshots and logs before changing `bootSmokeGood`.
+This evidence does not establish installation, cluster readiness, air-gap operation, or release approval. Review the staged screenshots and logs before changing the bootSmokeGood field.
 EOF
 
 rm -f "$evidence_dir/boot-smoke-target.qcow2" "$evidence_dir/OVMF_VARS.fd" "$evidence_dir/qmp-command.py" "$qmp_socket"
