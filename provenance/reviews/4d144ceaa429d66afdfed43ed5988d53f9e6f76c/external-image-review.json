@@ -1,0 +1,26 @@
+{
+  "alias_count": 116,
+  "alias_inventory_sha256": "6b222c84084744c71abae13bef85fcba3c6392eca5a436db144844253214046a",
+  "applied": true,
+  "approved_repository_prefixes": [
+    "docker.io/aquasec/",
+    "docker.io/kubeovn/",
+    "docker.io/longhornio/",
+    "docker.io/rancher/",
+    "ghcr.io/k8snetworkplumbingwg/",
+    "registry.k8s.io/descheduler/",
+    "registry.k8s.io/sig-storage/",
+    "registry.suse.com/bci/",
+    "registry.suse.com/suse/"
+  ],
+  "candidate_sha256": "c350e0f009e15307b1b8d8c1f5ae19da0c169a971311f449f182b788a3d1fad1",
+  "eligible_for_incomplete_lock_merge": true,
+  "errors": [],
+  "immutable_image_ref_count": 116,
+  "production_lock_complete": false,
+  "release_approved": false,
+  "schema": "layersentry.external-image-review/v1",
+  "source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c",
+  "verified_tool_artifact_count": 3,
+  "warnings": []
+}
