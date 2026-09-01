@@ -3,6 +3,12 @@ set -e
 
 cd $(dirname $0)
 
+python3 ./provenance/verify_os_package_binding.py \
+  --plan ../provenance/layersentry-v1.0-harvester-os-input.json \
+  --lock ../provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+  --repo-root .. \
+  --report ../dist/os-package-binding-report.json
+
 ./check-images
 ./build
 ./test
