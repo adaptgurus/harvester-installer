@@ -1,0 +1,130 @@
+name: LayerSentry v1.0 external image lock review
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-external-image-review.yml
+      - scripts/provenance/review_external_discovery.py
+      - tests/test_review_external_discovery.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layersentry-v1.0-external-image-review
+  cancel-in-progress: false
+
+env:
+  DISCOVERY_SOURCE_COMMIT: 4d144ceaa429d66afdfed43ed5988d53f9e6f76c
+  LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+
+jobs:
+  review-and-merge:
+    name: Review external OCI inputs and retain fail-closed lock
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact review source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Validate review implementation and discovery integrity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover -s tests -p 'test_review_external_discovery.py' -v
+          discovery="provenance/discovery/$DISCOVERY_SOURCE_COMMIT"
+          test -d "$discovery"
+          sha256sum -c "$discovery/discovery-files.sha256"
+          echo "DISCOVERY_DIR=$discovery" >> "$GITHUB_ENV"
+          review="provenance/reviews/$DISCOVERY_SOURCE_COMMIT"
+          mkdir -p "$review"
+          echo "REVIEW_DIR=$review" >> "$GITHUB_ENV"
+
+      - name: Dry-run independent external image review
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/review_external_discovery.py \
+            --candidate "$DISCOVERY_DIR/image-lock-candidate.json" \
+            --failures "$DISCOVERY_DIR/image-resolution-failures.json" \
+            --aliases "$DISCOVERY_DIR/image-aliases.txt" \
+            --input-discovery "$DISCOVERY_DIR/input-discovery.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$DISCOVERY_SOURCE_COMMIT" \
+            --report "$REVIEW_DIR/external-image-review-dry-run.json"
+
+      - name: Merge reviewed external inputs into incomplete lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/review_external_discovery.py \
+            --candidate "$DISCOVERY_DIR/image-lock-candidate.json" \
+            --failures "$DISCOVERY_DIR/image-resolution-failures.json" \
+            --aliases "$DISCOVERY_DIR/image-aliases.txt" \
+            --input-discovery "$DISCOVERY_DIR/input-discovery.json" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$DISCOVERY_SOURCE_COMMIT" \
+            --report "$REVIEW_DIR/external-image-review.json" \
+            --apply
+
+      - name: Revalidate incomplete lock and alias coverage
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$REVIEW_DIR/structural-lock-report.json"
+          python3 scripts/provenance/verify_image_coverage.py \
+            "$LOCK_FILE" \
+            "$DISCOVERY_DIR" \
+            --report "$REVIEW_DIR/external-image-coverage-report.json"
+          python3 - "$LOCK_FILE" "$REVIEW_DIR/external-image-review.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          review = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          assert lock["lock_status"] == "incomplete"
+          assert review["release_approved"] is False
+          assert review["production_lock_complete"] is False
+          assert review["alias_count"] == 116
+          assert review["immutable_image_ref_count"] > 0
+          assert len(lock["container_images"]) == review["immutable_image_ref_count"]
+          assert len(lock["toolchain_artifacts"]) >= 3
+          unresolved = {item["id"] for item in lock["unresolved"]}
+          assert len(unresolved) == 7
+          assert "trivy-scanner-image" not in unresolved
+          assert "bci-evidence-verifier-image" not in unresolved
+          assert "harvester-offline-image-set" in unresolved
+          assert "layersentry-controller-image" in unresolved
+          assert "layersentry-full-offline-builder-image" in unresolved
+          PY
+          sha256sum "$REVIEW_DIR"/*.json > "$REVIEW_DIR/review-files.sha256"
+
+      - name: Commit reviewed external inputs without enabling build
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --quiet origin layersentry-v1.0-dev
+          test "$(git rev-parse origin/layersentry-v1.0-dev)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$LOCK_FILE" "$REVIEW_DIR"
+          test -n "$(git status --porcelain)"
+          git commit -m "chore(provenance): lock reviewed external OCI inputs [skip ci]"
+          git push origin HEAD:refs/heads/layersentry-v1.0-dev
