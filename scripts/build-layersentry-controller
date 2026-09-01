@@ -6,15 +6,6 @@ CONTROLLER_VERSION=v1.0.0
 CONTROLLER_REPOSITORY=ghcr.io/adaptgurus/layersentry-controller
 LOCK_FILE=${LAYERSENTRY_LOCK_FILE:-"$TOP_DIR/provenance/layersentry-v1.0-harvester-v1.8.2.lock.json"}
 
-fail() {
-  echo "ERROR: $*" >&2
-  exit 1
-}
-
-for command in docker go git python3 sha256sum stat cmp touch tar find xargs mktemp; do
-  command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
-done
-
 SOURCE_INPUTS=(
   go.mod
   cmd/layersentry-controller/main.go
@@ -30,6 +21,16 @@ SOURCE_INPUTS=(
   .github/workflows/layersentry-v1.0-controller-lock.yml
 )
 
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+for command in docker go git python3 sha256sum stat cmp touch tar find xargs mktemp; do
+  command -v "$command" >/dev/null 2>&1 \
+    || fail "required command is missing: $command"
+done
+
 build_binary() {
   local source_file=$1 output=$2 source_commit=$3 build_epoch=$4
   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
@@ -43,21 +44,11 @@ build_binary() {
   touch -d "@${build_epoch}" "$output"
 }
 
-normalize_context() {
-  local context=$1 build_epoch=$2
+build_candidate_image() {
+  local context=$1 tag=$2 source_commit=$3 build_epoch=$4
   find "$context" -depth -print0 \
     | xargs -0 touch -h -d "@${build_epoch}"
-}
-
-build_image() {
-  local context=$1 tag=$2 source_commit=$3 build_epoch=$4
-  normalize_context "$context" "$build_epoch"
   docker image rm -f "$tag" >/dev/null 2>&1 || true
-
-  # The locked builder uses Buildx's docker driver. SOURCE_DATE_EPOCH is
-  # declared in the Dockerfile and passed explicitly so BuildKit normalizes
-  # source metadata while --load uses the supported exporter. The registry
-  # manifest itself is locked by digest after the candidate build.
   SOURCE_DATE_EPOCH="$build_epoch" \
     docker buildx build \
       --load \
@@ -74,7 +65,6 @@ build_image() {
       -t "$tag" \
       -f "$context/Dockerfile" \
       "$context"
-
   docker image inspect "$tag" >/dev/null
 }
 
@@ -106,12 +96,15 @@ projection = {
         "working_dir": item.get("Config", {}).get("WorkingDir"),
     },
 }
-output.write_text(json.dumps(projection, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+output.write_text(
+    json.dumps(projection, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
 raw.unlink()
 PY
 }
 
-validate_local_image() {
+validate_self_test() {
   local image=$1 source_commit=$2 build_epoch=$3 output=$4
   docker run --rm --network none --read-only --cap-drop ALL \
     --security-opt no-new-privileges \
@@ -140,7 +133,8 @@ write_source_inputs() {
   local output=$1 path
   : > "$output"
   for path in "${SOURCE_INPUTS[@]}"; do
-    [[ -f "$TOP_DIR/$path" ]] || fail "required controller source input is missing: $path"
+    [[ -f "$TOP_DIR/$path" ]] \
+      || fail "required controller source input is missing: $path"
     printf '%s\t%s\t%s\n' \
       "$path" \
       "$(stat -c '%s' "$TOP_DIR/$path")" \
@@ -175,15 +169,21 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-inspection = json.loads((output / "image-inspect.json").read_text(encoding="utf-8"))
+inspection = json.loads(
+    (output / "image-inspect.json").read_text(encoding="utf-8")
+)
 config_digest = str(inspection.get("id", ""))
 if not re.fullmatch(r"sha256:[0-9a-f]{64}", config_digest):
     raise SystemExit("controller image config digest is invalid")
 if inspection.get("os") != "linux" or inspection.get("architecture") != "amd64":
     raise SystemExit("controller image platform is not linux/amd64")
 rootfs = inspection.get("rootfs_layers")
-if not isinstance(rootfs, list) or len(rootfs) != 1:
-    raise SystemExit("scratch controller image must contain exactly one rootfs layer")
+if (
+    not isinstance(rootfs, list)
+    or len(rootfs) != 1
+    or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(rootfs[0]))
+):
+    raise SystemExit("scratch controller image must contain one valid rootfs layer")
 config = inspection.get("config", {})
 labels = config.get("labels", {})
 expected_labels = {
@@ -201,7 +201,8 @@ expected_labels = {
 for key, expected in expected_labels.items():
     if labels.get(key) != expected:
         raise SystemExit(
-            f"controller image label {key!r} is {labels.get(key)!r}; expected {expected!r}"
+            f"controller image label {key!r} is {labels.get(key)!r}; "
+            f"expected {expected!r}"
         )
 if config.get("user") != "65532:65532":
     raise SystemExit("controller image does not run as UID/GID 65532:65532")
@@ -209,13 +210,17 @@ if config.get("entrypoint") != ["/usr/local/bin/layersentry-controller"]:
     raise SystemExit("controller image has an unexpected entrypoint")
 if config.get("cmd") != ["--listen", "0.0.0.0:9443"]:
     raise SystemExit("controller image has an unexpected command")
+if config.get("working_dir") != "":
+    raise SystemExit("controller image has an unexpected working directory")
 
 source_inputs = []
 for line in (output / "source-inputs.tsv").read_text(encoding="utf-8").splitlines():
     path, size, checksum = line.split("\t")
     if not sha256_re.fullmatch(checksum):
         raise SystemExit(f"invalid source-input checksum for {path}")
-    source_inputs.append({"path": path, "bytes": int(size), "sha256": checksum})
+    source_inputs.append(
+        {"path": path, "bytes": int(size), "sha256": checksum}
+    )
 
 binary = output / "layersentry-controller-linux-amd64"
 sbom = output / "controller-sbom.spdx.json"
@@ -258,7 +263,8 @@ candidate = {
     "release_approved": False,
 }
 (output / "controller-image-candidate.json").write_text(
-    json.dumps(candidate, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    json.dumps(candidate, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
 )
 (output / "STATUS.md").write_text(
     f"""# LayerSentry controller image candidate
@@ -279,11 +285,13 @@ PY
 }
 
 candidate_mode() {
-  [[ $# -eq 4 ]] || fail "usage: $0 --candidate OUTPUT_DIR SOURCE_COMMIT SOURCE_ALIAS VERSION_ALIAS"
+  [[ $# -eq 4 ]] \
+    || fail "usage: $0 --candidate OUTPUT_DIR SOURCE_COMMIT SOURCE_ALIAS VERSION_ALIAS"
   local output_dir=$1 source_commit=$2 source_alias=$3 version_alias=$4
   local build_epoch work local1 local2 source_digest version_digest controller_ref
 
-  [[ $source_commit =~ ^[0-9a-f]{40}$ ]] || fail "source commit must be exactly 40 lowercase hex characters"
+  [[ $source_commit =~ ^[0-9a-f]{40}$ ]] \
+    || fail "source commit must be exactly 40 lowercase hex characters"
   [[ $source_alias == "${CONTROLLER_REPOSITORY}:source-${source_commit}" ]] \
     || fail "source alias is not bound to the exact source commit"
   [[ $version_alias == "${CONTROLLER_REPOSITORY}:${CONTROLLER_VERSION}" ]] \
@@ -292,7 +300,8 @@ candidate_mode() {
     || fail "candidate build must run from the exact source commit"
 
   build_epoch=$(git -C "$TOP_DIR" show -s --format=%ct "$source_commit")
-  [[ $build_epoch =~ ^[1-9][0-9]*$ ]] || fail "could not derive deterministic source commit epoch"
+  [[ $build_epoch =~ ^[1-9][0-9]*$ ]] \
+    || fail "could not derive deterministic source commit epoch"
   output_dir=$(mkdir -p "$output_dir" && cd "$output_dir" && pwd)
   rm -rf "$output_dir"/*
   work="$output_dir/work"
@@ -308,20 +317,20 @@ candidate_mode() {
     "$output_dir/layersentry-controller-linux-amd64"
   install -p -m 0555 "$work/pass1/layersentry-controller" \
     "$work/context/bin/layersentry-controller"
-  cp "$TOP_DIR/package/layersentry-controller/Dockerfile" "$work/context/Dockerfile"
+  cp "$TOP_DIR/package/layersentry-controller/Dockerfile" \
+    "$work/context/Dockerfile"
 
   local1="layersentry/controller-candidate:${source_commit:0:12}-pass1"
   local2="layersentry/controller-candidate:${source_commit:0:12}-pass2"
-  build_image "$work/context" "$local1" "$source_commit" "$build_epoch"
+  build_candidate_image "$work/context" "$local1" "$source_commit" "$build_epoch"
   canonical_inspect "$local1" "$work/pass1/image-inspect.json"
-  build_image "$work/context" "$local2" "$source_commit" "$build_epoch"
+  build_candidate_image "$work/context" "$local2" "$source_commit" "$build_epoch"
   canonical_inspect "$local2" "$work/pass2/image-inspect.json"
   cmp "$work/pass1/image-inspect.json" "$work/pass2/image-inspect.json"
   cp "$work/pass1/image-inspect.json" "$output_dir/image-inspect.json"
-
-  validate_local_image "$local1" "$source_commit" "$build_epoch" \
+  validate_self_test "$local1" "$source_commit" "$build_epoch" \
     "$work/pass1/self-test.json"
-  validate_local_image "$local2" "$source_commit" "$build_epoch" \
+  validate_self_test "$local2" "$source_commit" "$build_epoch" \
     "$work/pass2/self-test.json"
   cmp "$work/pass1/self-test.json" "$work/pass2/self-test.json"
 
@@ -329,10 +338,10 @@ candidate_mode() {
   docker tag "$local1" "$version_alias"
   docker push "$source_alias" | tee "$work/source-push.log"
   docker push "$version_alias" | tee "$work/version-push.log"
-  source_digest=$(grep -Eo 'digest: sha256:[0-9a-f]{64}' "$work/source-push.log" \
-    | tail -n 1 | awk '{print $2}')
-  version_digest=$(grep -Eo 'digest: sha256:[0-9a-f]{64}' "$work/version-push.log" \
-    | tail -n 1 | awk '{print $2}')
+  source_digest=$(grep -Eo 'digest: sha256:[0-9a-f]{64}' \
+    "$work/source-push.log" | tail -n 1 | awk '{print $2}')
+  version_digest=$(grep -Eo 'digest: sha256:[0-9a-f]{64}' \
+    "$work/version-push.log" | tail -n 1 | awk '{print $2}')
   [[ $source_digest =~ ^sha256:[0-9a-f]{64}$ ]] \
     || fail "could not determine pushed source-alias digest"
   [[ $version_digest == "$source_digest" ]] \
@@ -341,7 +350,8 @@ candidate_mode() {
   docker pull --platform linux/amd64 "$controller_ref" >/dev/null
 
   SYFT_CHECK_FOR_APP_UPDATE=false \
-    syft "$controller_ref" -o spdx-json > "$output_dir/controller-sbom.spdx.json"
+    syft "$controller_ref" -o spdx-json \
+      > "$output_dir/controller-sbom.spdx.json"
   python3 - "$output_dir/controller-sbom.spdx.json" <<'PY'
 import json
 import sys
@@ -384,16 +394,20 @@ from pathlib import Path
 lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 script_path = Path(sys.argv[2])
 sources = [
-    item for item in lock.get("source_locks", [])
+    item
+    for item in lock.get("source_locks", [])
     if item.get("component") == "layersentry-controller"
 ]
 images = [
-    item for item in lock.get("container_images", [])
+    item
+    for item in lock.get("container_images", [])
     if item.get("id") == "layersentry-controller"
 ]
 reviewed = lock.get("reviewed_controller_image")
 if len(sources) != 1 or len(images) != 1 or not isinstance(reviewed, dict):
-    raise SystemExit("controller source, image, or reviewed metadata is not completely locked")
+    raise SystemExit(
+        "controller source, image, or reviewed metadata is not completely locked"
+    )
 source, image = sources[0], images[0]
 commit = str(source.get("commit", ""))
 if not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -406,7 +420,8 @@ if (
     raise SystemExit("controller source repository or version is unexpected")
 ref = str(image.get("ref", ""))
 if not re.fullmatch(
-    r"ghcr\.io/adaptgurus/layersentry-controller@sha256:[0-9a-f]{64}", ref
+    r"ghcr\.io/adaptgurus/layersentry-controller@sha256:[0-9a-f]{64}",
+    ref,
 ):
     raise SystemExit("controller image is not an exact GHCR digest")
 version_alias = "ghcr.io/adaptgurus/layersentry-controller:v1.0.0"
@@ -434,7 +449,6 @@ values = [
     source_alias,
     str(reviewed.get("build_epoch", "")),
     str(reviewed.get("binary_sha256", "")),
-    str(reviewed.get("image_config_digest", "")),
 ]
 if any("\n" in value or "\r" in value for value in values):
     raise SystemExit("controller binding contains a newline")
@@ -442,111 +456,99 @@ print("\n".join(values))
 PY
 }
 
+verify_locked_image() {
+  local controller_ref=$1 source_commit=$2 build_epoch=$3 output=$4
+  docker image inspect "$controller_ref" > "$output"
+  python3 - "$output" "$LOCK_FILE" "$controller_ref" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+inspection_path = Path(sys.argv[1])
+lock_path = Path(sys.argv[2])
+ref = sys.argv[3]
+values = json.loads(inspection_path.read_text(encoding="utf-8"))
+lock = json.loads(lock_path.read_text(encoding="utf-8"))
+if not isinstance(values, list) or len(values) != 1:
+    raise SystemExit("locked controller inspect did not return exactly one image")
+reviewed = lock.get("reviewed_controller_image")
+if not isinstance(reviewed, dict):
+    raise SystemExit("reviewed controller metadata is missing")
+item = values[0]
+if item.get("Id") != "sha256:" + reviewed.get("image_config_digest", ""):
+    raise SystemExit("pulled controller config digest differs from reviewed evidence")
+manifest_digest = ref.split("@", 1)[1]
+if not any(
+    str(value).endswith(manifest_digest)
+    for value in item.get("RepoDigests") or []
+):
+    raise SystemExit("pulled controller does not retain the reviewed manifest digest")
+if item.get("Os") != "linux" or item.get("Architecture") != "amd64":
+    raise SystemExit("pulled controller platform is not linux/amd64")
+if item.get("RootFS", {}).get("Layers") != reviewed.get("rootfs_diff_ids"):
+    raise SystemExit("pulled controller rootfs differs from reviewed evidence")
+config = item.get("Config") or {}
+comparisons = {
+    "User": reviewed.get("runtime_user"),
+    "Entrypoint": reviewed.get("entrypoint"),
+    "Cmd": reviewed.get("cmd"),
+    "Labels": reviewed.get("image_labels"),
+    "WorkingDir": "",
+}
+for field, expected in comparisons.items():
+    if config.get(field) != expected:
+        raise SystemExit(
+            f"pulled controller config field {field!r} is {config.get(field)!r}; "
+            f"expected {expected!r}"
+        )
+if not re.fullmatch(r"[0-9a-f]{40}", str(reviewed.get("source_commit", ""))):
+    raise SystemExit("reviewed controller source commit is invalid")
+PY
+  validate_self_test "$controller_ref" "$source_commit" "$build_epoch" \
+    "${output}.self-test.json"
+}
+
 from_lock_mode() {
   [[ $# -eq 0 ]] || fail "usage: $0 --from-lock"
   [[ -f "$LOCK_FILE" ]] || fail "provenance lock is missing: $LOCK_FILE"
   local binding work source_commit controller_ref version_alias source_alias
-  local build_epoch binary_sha locked_config_digest local_tag
+  local build_epoch binary_sha
   local -a values
 
   binding=$(mktemp)
   read_lock_binding > "$binding"
   mapfile -t values < "$binding"
   rm -f "$binding"
-  [[ ${#values[@]} -eq 7 ]] || fail "controller lock binding is incomplete"
+  [[ ${#values[@]} -eq 6 ]] || fail "controller lock binding is incomplete"
   source_commit=${values[0]}
   controller_ref=${values[1]}
   version_alias=${values[2]}
   source_alias=${values[3]}
   build_epoch=${values[4]}
   binary_sha=${values[5]}
-  locked_config_digest=${values[6]}
 
   git -C "$TOP_DIR" merge-base --is-ancestor "$source_commit" HEAD \
     || fail "locked controller source commit is not an ancestor of the build source"
   work=$(mktemp -d "${RUNNER_TEMP:-/tmp}/layersentry-controller-rebuild.XXXXXX")
   trap 'rm -rf "$work"' RETURN
-  mkdir -p "$work/source" "$work/context/bin"
+  mkdir -p "$work/source" "$work/bin"
   git -C "$TOP_DIR" archive "$source_commit" \
     go.mod cmd/layersentry-controller package/layersentry-controller \
     | tar -x -C "$work/source"
 
   (cd "$work/source" && go test -count=1 ./cmd/layersentry-controller)
   build_binary "$work/source/cmd/layersentry-controller/main.go" \
-    "$work/context/bin/layersentry-controller" "$source_commit" "$build_epoch"
-  echo "$binary_sha  $work/context/bin/layersentry-controller" | sha256sum -c -
-  cp "$work/source/package/layersentry-controller/Dockerfile" "$work/context/Dockerfile"
+    "$work/bin/layersentry-controller" "$source_commit" "$build_epoch"
+  echo "$binary_sha  $work/bin/layersentry-controller" | sha256sum -c -
 
-  local_tag="layersentry/controller-source-rebuild:${source_commit:0:12}"
-  build_image "$work/context" "$local_tag" "$source_commit" "$build_epoch"
-  validate_local_image "$local_tag" "$source_commit" "$build_epoch" \
-    "$work/self-test.json"
-  canonical_inspect "$local_tag" "$work/image-inspect.json"
-
-  # BuildKit's docker driver can stamp non-runtime image-history metadata with
-  # the daemon clock. The source rebuild therefore proves the immutable binary,
-  # rootfs content and every runtime/security-relevant config field. The ISO is
-  # then populated from the exact reviewed registry digest, never from the
-  # timestamp-variant local config object.
-  python3 - "$work/image-inspect.json" "$LOCK_FILE" <<'PY'
-import json
-import re
-import sys
-from pathlib import Path
-
-inspection = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-lock = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
-reviewed = lock.get("reviewed_controller_image")
-if not isinstance(reviewed, dict):
-    raise SystemExit("reviewed controller metadata is missing")
-if inspection.get("os") != "linux" or inspection.get("architecture") != "amd64":
-    raise SystemExit("source-rebuilt controller platform is not linux/amd64")
-if not re.fullmatch(r"sha256:[0-9a-f]{64}", str(inspection.get("id", ""))):
-    raise SystemExit("source-rebuilt controller config ID is invalid")
-if inspection.get("rootfs_layers") != reviewed.get("rootfs_diff_ids"):
-    raise SystemExit("source-rebuilt controller rootfs differs from reviewed evidence")
-config = inspection.get("config")
-if not isinstance(config, dict):
-    raise SystemExit("source-rebuilt controller config is missing")
-comparisons = {
-    "user": reviewed.get("runtime_user"),
-    "entrypoint": reviewed.get("entrypoint"),
-    "cmd": reviewed.get("cmd"),
-    "labels": reviewed.get("image_labels"),
-    "working_dir": "",
-}
-for field, expected in comparisons.items():
-    if config.get(field) != expected:
-        raise SystemExit(
-            f"source-rebuilt controller config field {field!r} is "
-            f"{config.get(field)!r}; expected {expected!r}"
-        )
-PY
-
-  # The stable aliases consumed by build-bundle must resolve to the exact
-  # reviewed manifest. Pull by digest, verify both RepoDigest and config ID,
-  # then overwrite the source-rebuild aliases with that immutable image.
+  # The independently rebuilt binary is the source-equivalence proof. The ISO
+  # never consumes a timestamp-variant local image. It consumes only the exact
+  # reviewed registry manifest after config, rootfs, platform and self-test
+  # verification against the lock.
   docker pull --platform linux/amd64 "$controller_ref" >/dev/null
-  python3 - "$controller_ref" "$locked_config_digest" <<'PY'
-import json
-import subprocess
-import sys
-
-ref, expected_config = sys.argv[1:]
-values = json.loads(
-    subprocess.check_output(["docker", "image", "inspect", ref], text=True)
-)
-if len(values) != 1:
-    raise SystemExit("locked controller inspect did not return exactly one image")
-item = values[0]
-if item.get("Id") != "sha256:" + expected_config:
-    raise SystemExit("pulled controller config digest differs from reviewed evidence")
-manifest_digest = ref.split("@", 1)[1]
-if not any(str(value).endswith(manifest_digest) for value in item.get("RepoDigests") or []):
-    raise SystemExit("pulled controller does not retain the reviewed manifest digest")
-if item.get("Os") != "linux" or item.get("Architecture") != "amd64":
-    raise SystemExit("pulled controller platform is not linux/amd64")
-PY
+  verify_locked_image "$controller_ref" "$source_commit" "$build_epoch" \
+    "$work/locked-image-inspect.json"
   docker tag "$controller_ref" "$version_alias"
   docker tag "$controller_ref" "$source_alias"
 
