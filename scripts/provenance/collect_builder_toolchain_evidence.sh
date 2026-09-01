@@ -192,7 +192,12 @@ for tool_id, command, version_args in definitions:
         check=False,
     )
     rpm_owner = " ".join(owner_proc.stdout.split()) if owner_proc.returncode == 0 else ""
-    version = version_output or rpm_owner
+    # RPM NEVRA is the canonical, deterministic version for packaged binaries.
+    # CLI output remains the fallback for checksum-staged binaries that have no
+    # RPM owner. Some daemon CLIs emit timestamped diagnostics even for
+    # --version; those diagnostics must not become release identity.
+    version = rpm_owner or version_output
+    version_source = "rpm-nevra" if rpm_owner else "command-output"
     if not version:
         raise SystemExit(f"could not derive a version for builder tool {tool_id}")
     tools.append(
@@ -202,6 +207,7 @@ for tool_id, command, version_args in definitions:
             "bytes": path.stat().st_size,
             "sha256": sha256(path),
             "version": version[:500],
+            "version_source": version_source,
             "rpm_owner": rpm_owner or None,
             "source": f"oci-file://{image_ref}#{path}",
         }
@@ -233,6 +239,11 @@ if inventory.get("tool_count") != 25:
     raise SystemExit(
         f"builder toolchain inventory contains {inventory.get('tool_count')} tools; expected 25"
     )
+for tool in inventory.get("tools", []):
+    if tool.get("version_source") not in {"rpm-nevra", "command-output"}:
+        raise SystemExit(f"builder tool {tool.get('id')!r} has no canonical version source")
+    if tool.get("rpm_owner") and tool.get("version") != tool.get("rpm_owner"):
+        raise SystemExit(f"builder tool {tool.get('id')!r} does not use RPM NEVRA as version")
 PY
 
 (
