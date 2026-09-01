@@ -37,7 +37,9 @@ source ${SCRIPTS_DIR}/version-rancher
 source ${SCRIPTS_DIR}/version-harvester ${TOP_DIR}/../harvester
 source ${SCRIPTS_DIR}/lib/iso
 
-BASE_OS_IMAGE="rancher/harvester-os:v1.8-20260806"
+# The reviewed tag is retained only as provenance metadata. The build consumes
+# the immutable linux/amd64 OCI digest and must find it in the offline cache.
+BASE_OS_IMAGE="docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4"
 HARVESTER_OS_IMAGE=rancher/harvester-os:$VERSION
 
 cd ${PACKAGE_HARVESTER_OS_DIR}
@@ -68,7 +70,10 @@ ${SCRIPTS_DIR}/collect-deps.sh harvester-release.yaml
 echo "The harvester-release info is"
 cat ./harvester-release.yaml
 
-docker build --pull \
+# A full-offline build may not contact a registry here. The immutable base image
+# must already be staged by the locked image-set preparation step.
+docker image inspect "${BASE_OS_IMAGE}" >/dev/null
+docker build --pull=false \
 	--build-arg BASE_OS_IMAGE="${BASE_OS_IMAGE}" \
 	--build-arg HARVESTER_PRETTY_NAME="${PRETTY_NAME}" \
   --build-arg ARCH="${ARCH}" \
