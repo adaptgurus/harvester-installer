@@ -1,0 +1,9 @@
+24893316fb185820406deadd7e7b4854676dd296f8946fc546b53afca2433be0  ./STATUS.md
+28505a632101a14baf8c472e6a50ac9c632e995acdacee099c3cac722d92e9f2  ./builder-sbom-evidence.json
+159acb24bf95f92cca02643392e8e6628a72dfc44d8c4623ea747ca2ec45e8fe  ./builder-sbom.spdx.json
+885e724d8a72f0fd51c649913909714cb83d8f4473552f0db761b4da96390274  ./builder-toolchain-candidate.json
+b51c3c2d8305ba25b2fb83d9caf2f60c76c201948e51c6bef9777fb478bc40ec  ./image-inspect.json
+99d577f55ce8106fd33c532a764f26312b157e2785edaf9feb53e0260f4103bc  ./internal-daemon-smoke.txt
+3b5baabf6ea82326ec7b7ed542bc89f7210799e86b7d5639662323f001e0ce03  ./rpm-packages.tsv
+b931ba8b0bc3cacc307c4fe8d23cb3b2c9a5b796ef8735a317881118dc99f148  ./source-inputs.tsv
+4adf183df28a1fc95248593ba5ac9ed9d6f9e4e5c0009c5504ec0909489206b2  ./toolchain.json

@@ -1,0 +1,11 @@
+{
+  "builder_ref": "ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b",
+  "bytes": 20033598,
+  "file": "builder-sbom.spdx.json",
+  "format": "SPDX JSON",
+  "package_count": 1761,
+  "release_approved": false,
+  "schema": "layersentry.builder-sbom-evidence/v1",
+  "sha256": "159acb24bf95f92cca02643392e8e6628a72dfc44d8c4623ea747ca2ec45e8fe",
+  "source_commit": "3ea7e46e3e59569c118f5ed288d1ce6a05150dec"
+}

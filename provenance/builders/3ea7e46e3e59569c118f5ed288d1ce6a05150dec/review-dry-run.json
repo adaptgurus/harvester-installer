@@ -1,0 +1,21 @@
+{
+  "applied": false,
+  "builder_ref": "ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b",
+  "candidate_sha256": "885e724d8a72f0fd51c649913909714cb83d8f4473552f0db761b4da96390274",
+  "lock_status": "incomplete",
+  "production_lock_complete": false,
+  "release_approved": false,
+  "remaining_unresolved_count": 2,
+  "remaining_unresolved_ids": [
+    "harvester-offline-image-set",
+    "layersentry-controller-image"
+  ],
+  "removed_unresolved_ids": [
+    "build-toolchain",
+    "layersentry-full-offline-builder-image"
+  ],
+  "schema": "layersentry.builder-toolchain-lock-review/v1",
+  "source_commit": "3ea7e46e3e59569c118f5ed288d1ce6a05150dec",
+  "tool_count": 25,
+  "toolchain_artifact_count": 29
+}

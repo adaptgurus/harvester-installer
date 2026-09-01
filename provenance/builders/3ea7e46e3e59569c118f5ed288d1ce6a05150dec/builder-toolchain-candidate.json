@@ -1,0 +1,196 @@
+{
+  "builder_image": {
+    "aliases": [
+      "ghcr.io/adaptgurus/layersentry-full-offline-builder:source-3ea7e46e3e59569c118f5ed288d1ce6a05150dec"
+    ],
+    "id": "layersentry-full-offline-builder",
+    "ref": "ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b"
+  },
+  "platform": "linux/amd64",
+  "release_approved": false,
+  "release_identity": {
+    "embedded_platform": "Harvester v1.8.2",
+    "product": "LayerSentry v1.0"
+  },
+  "rootfs_layer_count": 10,
+  "schema": "layersentry.builder-toolchain-candidate/v1",
+  "source_commit": "3ea7e46e3e59569c118f5ed288d1ce6a05150dec",
+  "source_input_count": 13,
+  "tool_count": 25,
+  "toolchain_artifacts": [
+    {
+      "id": "layersentry-builder-awk",
+      "sha256": "81d63950985ea0246688a8e7f1257ee707205e347fe21ec95bbd94b85c6ec069",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/gawk",
+      "version": "gawk-0:4.2.1-150000.3.6.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-curl",
+      "sha256": "93129e207c34ac9ee458d1fabd39c9bb86c102748797e1128ba9abdece221268",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/curl",
+      "version": "curl-0:8.14.1-150700.7.23.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-docker-buildx",
+      "sha256": "48af8a397ebd60178778bf63611dbcebe5f5e7a9be90eb9147b24b9587455778",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/local/lib/docker/cli-plugins/docker-buildx",
+      "version": "github.com/docker/buildx v0.36.1 1d8dde89b8aba914e05e45366770736fea1fd690"
+    },
+    {
+      "id": "layersentry-builder-docker-client",
+      "sha256": "675ce0c632c63e86d23a54b06441504119a66a957923a213321e900476de8894",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/docker",
+      "version": "docker-0:29.4.0_ce-150000.259.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-docker-daemon",
+      "sha256": "6ccea43560b409331ab5188fdf203b5ae3898e769a20bf89ef5aaa7cb3425a12",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/dockerd",
+      "version": "docker-0:29.4.0_ce-150000.259.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-dockerfile",
+      "sha256": "bc735cdada2009f0b0d5ae1460492438c8a9428c6ea7652e997158f68124559f",
+      "source": "git+https://github.com/adaptgurus/harvester-installer.git@3ea7e46e3e59569c118f5ed288d1ce6a05150dec#Dockerfile.dapper",
+      "version": "git-3ea7e46e3e59"
+    },
+    {
+      "id": "layersentry-builder-git",
+      "sha256": "70a3423f84100dcbb0302f3ca6a0595dc9ca507ba3aa846136f27fe79b742d1a",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/lib/git/git",
+      "version": "git-core-0:2.51.0-150600.3.15.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-go",
+      "sha256": "be8bde57000699385c19cebd220cbc07a0f7ff2a79362ca0eee358f43d7c24de",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/lib64/go/1.26/bin/go",
+      "version": "go1.26-0:1.26.7-150000.1.27.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-gzip",
+      "sha256": "5f29f6e684de569d5aa87db830709e190d4d8c0e00cbf264cf9676f94a05f0b8",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/gzip",
+      "version": "gzip-0:1.10-150200.16.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-helm",
+      "sha256": "1f7ed083dbc200a10fdfe04df94c21530140fdc955de5a1daed2694150f77b17",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/local/bin/helm",
+      "version": "v3.20.0+gb2e4314"
+    },
+    {
+      "id": "layersentry-builder-jq",
+      "sha256": "53e115c3047f446f14d1a50092dc07240df69de7c1667c5c6ab4e7350044bb6f",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/jq",
+      "version": "jq-0:1.6-150000.3.20.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-mcopy",
+      "sha256": "a6606004bcbb109f6a040fee97d67df4f1039635c1874a84a8b1f36a956effb2",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/mtools",
+      "version": "mtools-0:4.0.43-150600.1.6.x86_64"
+    },
+    {
+      "id": "layersentry-builder-mkfs-vfat",
+      "sha256": "765b804cd7335ebfce258d3018765e9f3bb4570b8771e0f25b49fe0a42041cd0",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/sbin/mkfs.fat",
+      "version": "dosfstools-0:4.1-3.6.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-mksquashfs",
+      "sha256": "b94893ce17cba651c65b6c89b3f43bf4605133378f04273b981bde1015f73a14",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/mksquashfs",
+      "version": "squashfs-0:4.6.1-150300.3.3.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-oci-manifest",
+      "sha256": "329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b",
+      "source": "oci://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b",
+      "version": "source-3ea7e46e3e59-linux-amd64"
+    },
+    {
+      "id": "layersentry-builder-patch",
+      "sha256": "39876bfbc3a41ad94aadfe4e0d8d7dca21e1ac044e05b7990cb3c94b79b40126",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/patch",
+      "version": "patch-0:2.7.6-150000.5.12.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-python3",
+      "sha256": "0ad16efc6f5162515eb313d49da31feaf45367cc379f983a6821cc0635fb53e4",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/python3.11",
+      "version": "python311-base-0:3.11.15-150600.3.65.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-rpm-inventory",
+      "sha256": "3b5baabf6ea82326ec7b7ed542bc89f7210799e86b7d5639662323f001e0ce03",
+      "source": "oci-inventory://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#rpm-nevra",
+      "version": "source-3ea7e46e3e59-linux-amd64"
+    },
+    {
+      "id": "layersentry-builder-rsync",
+      "sha256": "91ef98a3a11e3333989c1a04d30c62751b0997d52e316e73809228ff4c82ab05",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/rsync",
+      "version": "rsync-0:3.2.7-150600.3.24.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-sed",
+      "sha256": "1b86d111f21463dab62d5b0b76d252d1824c3eca0f1865f42f8f388c9c27f489",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/sed",
+      "version": "sed-0:4.9-150600.3.3.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-sha256sum",
+      "sha256": "b1c08f0aab6e364503ba3bcced25b0da8ae52496b86479bd9ccf3093972e7589",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/sha256sum",
+      "version": "coreutils-0:8.32-150400.9.12.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-sha512sum",
+      "sha256": "05791d849a90460c617935c6175d3c686dc62934643c9726d9fa642a0497040b",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/sha512sum",
+      "version": "coreutils-0:8.32-150400.9.12.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-source-contract",
+      "sha256": "b931ba8b0bc3cacc307c4fe8d23cb3b2c9a5b796ef8735a317881118dc99f148",
+      "source": "git+https://github.com/adaptgurus/harvester-installer.git@3ea7e46e3e59569c118f5ed288d1ce6a05150dec#locked-builder-inputs",
+      "version": "git-3ea7e46e3e59"
+    },
+    {
+      "id": "layersentry-builder-syft",
+      "sha256": "abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/local/bin/syft",
+      "version": "Application: syft Version: 1.51.1 BuildDate: 2026-08-27T16:55:02Z GitCommit: 91a0032987d91b7411b52f6f5c185c5e7f775495 GitDescription: v1.51.1 Platform: linux/amd64 GoVersion: go1.26.3 Compiler: gc SchemaVersion: 16.1.10"
+    },
+    {
+      "id": "layersentry-builder-tar",
+      "sha256": "da5361606d4f779f77f3a5c3787ffdfb3ecee01ba6c0e5f884fbb3f05a68d450",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/tar",
+      "version": "tar-0:1.34-150000.3.42.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-wget",
+      "sha256": "8dcf6243f8e615517c892016aa1df9d1b22de7ffdd7f6277fde0d447844d6874",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/wget",
+      "version": "wget-0:1.24.5-150700.3.9.1.x86_64"
+    },
+    {
+      "id": "layersentry-builder-xorriso",
+      "sha256": "29a351e9e2d2c1570a1f6267fe807ef22d1db5183fdd85ad87a947bd0381187c",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/xorriso",
+      "version": "xorriso-0:1.5.6-150600.1.6.x86_64"
+    },
+    {
+      "id": "layersentry-builder-yq",
+      "sha256": "75d893a0d5940d1019cb7cdc60001d9e876623852c31cfc6267047bc31149fa9",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/local/bin/yq",
+      "version": "yq (https://github.com/mikefarah/yq/) version v4.52.5"
+    },
+    {
+      "id": "layersentry-builder-zstd",
+      "sha256": "f4859ce7ec9ab8aed6da26ea2577a836657e1c1322d4f1f1a82ba0b22304fce6",
+      "source": "oci-file://ghcr.io/adaptgurus/layersentry-full-offline-builder@sha256:329e933d3fff98cd4d0c94ab803b7fb24b28a3cd1352661241170c57169e476b#/usr/bin/zstd",
+      "version": "zstd-0:1.5.7-150700.1.2.x86_64"
+    }
+  ]
+}
