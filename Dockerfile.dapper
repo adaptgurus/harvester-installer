@@ -24,12 +24,21 @@ LABEL org.opencontainers.image.source="https://github.com/adaptgurus/harvester-i
 # allowed only while constructing this image. The resulting OCI digest, full
 # RPM inventory and every release-critical binary are reviewed and locked
 # before this image can be used by the production ISO workflow.
+#
+# SLE 15 retains Python 3.6 as /usr/bin/python3. LayerSentry provenance scripts
+# require Python 3.11, so the builder installs the parallel python311 package
+# and makes it the first python/python3 resolved through /usr/local/bin.
 RUN test "${ARCH}" = "amd64" && \
     zypper -n rm container-suseconnect && \
     zypper -n install --no-recommends \
       git curl docker gzip tar wget zstd squashfs xorriso awk jq \
-      mtools dosfstools unzip rsync patch python3 coreutils findutils \
+      mtools dosfstools unzip rsync patch python3 python311 coreutils findutils \
       ca-certificates iptables iproute2 && \
+    python311_path="$(command -v python3.11)" && \
+    test -x "${python311_path}" && \
+    ln -sfn "${python311_path}" /usr/local/bin/python3 && \
+    ln -sfn "${python311_path}" /usr/local/bin/python && \
+    /usr/local/bin/python3 -c 'import sys; assert sys.version_info >= (3, 11)' && \
     zypper clean --all
 
 # yq
