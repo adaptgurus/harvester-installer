@@ -1,0 +1,6 @@
+yq	https://github.com/mikefarah/yq/releases/download/v4.52.5/yq_linux_amd64
+helm-v3.20.0-linux-amd64.tar.gz	https://get.helm.sh/helm-v3.20.0-linux-amd64.tar.gz
+wharfie-amd64	https://github.com/rancher/wharfie/releases/download/v0.6.8/wharfie-amd64
+rke2-images.linux-amd64.txt	https://github.com/rancher/rke2/releases/download/v1.35.7+rke2r1/rke2-images.linux-amd64.txt
+rke2-images-multus.linux-amd64.txt	https://github.com/rancher/rke2/releases/download/v1.35.7+rke2r1/rke2-images-multus.linux-amd64.txt
+longhorn-images-v1.11.2.txt	https://raw.githubusercontent.com/longhorn/longhorn/v1.11.2/deploy/longhorn-images.txt

@@ -1,0 +1,825 @@
+{
+  "alias_count": 116,
+  "captured_at": "2026-09-01T14:41:47Z",
+  "complete": true,
+  "container_images": [
+    {
+      "aliases": [
+        "docker.io/aquasec/trivy:0.69.3"
+      ],
+      "id": "docker-io-aquasec-trivy",
+      "ref": "docker.io/aquasec/trivy@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
+    },
+    {
+      "aliases": [
+        "docker.io/kubeovn/kube-ovn:v1.15.4"
+      ],
+      "id": "docker-io-kubeovn-kube-ovn",
+      "ref": "docker.io/kubeovn/kube-ovn@sha256:4a0e9ff3239136b8783fa777ac30583fe947118ff7acbd25b1e9127139a7bf2a"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/backing-image-manager:v1.11.2"
+      ],
+      "id": "docker-io-longhornio-backing-image-manager",
+      "ref": "docker.io/longhornio/backing-image-manager@sha256:fc7b656501e59896326de6d228319d883ae55591c1a2c90292043eab66c33e7b"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/csi-attacher:v4.11.0-20260428"
+      ],
+      "id": "docker-io-longhornio-csi-attacher",
+      "ref": "docker.io/longhornio/csi-attacher@sha256:fe417c28a6b86f8e7e5d49fc223e22e9ab457f894d2c4a321932d136dc2c2530"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/csi-node-driver-registrar:v2.16.0-20260428"
+      ],
+      "id": "docker-io-longhornio-csi-node-driver-registrar",
+      "ref": "docker.io/longhornio/csi-node-driver-registrar@sha256:e82a8c8f800d7fbb3c1edf3f90b557768091821a44d52280093394f7918ccb68"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/csi-provisioner:v5.3.0-20260428"
+      ],
+      "id": "docker-io-longhornio-csi-provisioner",
+      "ref": "docker.io/longhornio/csi-provisioner@sha256:9e519a21a77c060104716e1f98222bb46ab617778a3bfcd861c87119a8256764"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/csi-resizer:v2.1.0-20260428"
+      ],
+      "id": "docker-io-longhornio-csi-resizer",
+      "ref": "docker.io/longhornio/csi-resizer@sha256:41cb674d1154e798aa2c20f53f72ee2a5597f1369bcad5878d1708aee47f6663"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/csi-snapshotter:v8.5.0-20260428"
+      ],
+      "id": "docker-io-longhornio-csi-snapshotter",
+      "ref": "docker.io/longhornio/csi-snapshotter@sha256:1975fac3890f4e08b98792881cb597502112ce0eeeaaef383e52458c96db94c5"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/livenessprobe:v2.18.0-20260428"
+      ],
+      "id": "docker-io-longhornio-livenessprobe",
+      "ref": "docker.io/longhornio/livenessprobe@sha256:eae162f7e70fb981f90d9206f299dddaf590c0c896cfb67acceca12cef526a44"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/longhorn-cli:v1.11.2"
+      ],
+      "id": "docker-io-longhornio-longhorn-cli",
+      "ref": "docker.io/longhornio/longhorn-cli@sha256:c2e57e131cc001418f8ad329eb8d25f9fb69fa0eb0e546e1b6ee94aa22916381"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/longhorn-engine:v1.11.2"
+      ],
+      "id": "docker-io-longhornio-longhorn-engine",
+      "ref": "docker.io/longhornio/longhorn-engine@sha256:7482e0437fbf475e1e32696fab22f47bf99b1ef8d067ffce9e34028347722628"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/longhorn-instance-manager:v1.11.2"
+      ],
+      "id": "docker-io-longhornio-longhorn-instance-manager",
+      "ref": "docker.io/longhornio/longhorn-instance-manager@sha256:16dac125ef30bd3a375bc8ff7d10636ea0302d22d208c0cfb1be37ebb93ca30b"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/longhorn-manager:v1.11.2"
+      ],
+      "id": "docker-io-longhornio-longhorn-manager",
+      "ref": "docker.io/longhornio/longhorn-manager@sha256:0f80ca11ac4eb7522f4e6e801a7afc9909ea8d3041575f3d029964c46590f096"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/longhorn-share-manager:v1.11.2"
+      ],
+      "id": "docker-io-longhornio-longhorn-share-manager",
+      "ref": "docker.io/longhornio/longhorn-share-manager@sha256:c11559e998ea982e6bac1637d66cc2aaab662a6b546709f2e54e2bfa50ffb0c3"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/longhorn-ui:v1.11.2"
+      ],
+      "id": "docker-io-longhornio-longhorn-ui",
+      "ref": "docker.io/longhornio/longhorn-ui@sha256:885bc78f99f31da0d9b0fd8f533a53558a3aa81f9719c62e0d3c69ed8456d5b7"
+    },
+    {
+      "aliases": [
+        "docker.io/longhornio/support-bundle-kit:v0.0.84"
+      ],
+      "id": "docker-io-longhornio-support-bundle-kit",
+      "ref": "docker.io/longhornio/support-bundle-kit@sha256:cf2a89ed18a73e32b3fe657aefb8f819a1c6734df888821b3dff056b360fe222"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/appco-alertmanager:0.28.1-12.7"
+      ],
+      "id": "docker-io-rancher-appco-alertmanager",
+      "ref": "docker.io/rancher/appco-alertmanager@sha256:da0d4e0ff70b506c01b6586d1d527e0c352c4731752946d3df74d4895a11c9db"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/appco-grafana:12.1.1-2.2"
+      ],
+      "id": "docker-io-rancher-appco-grafana",
+      "ref": "docker.io/rancher/appco-grafana@sha256:a922a24b45a384fde5fa42b11cf6bd999eec5f9f971148bb92ef826d05d3eb7e"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/appco-k8s-sidecar:1.30.7-11.3"
+      ],
+      "id": "docker-io-rancher-appco-k8s-sidecar",
+      "ref": "docker.io/rancher/appco-k8s-sidecar@sha256:7dabf60ad1f13169c6d4948e69198ccbe5471037248aa43bb11c3830cd9ee611"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/appco-kube-state-metrics:2.17.0-10.7"
+      ],
+      "id": "docker-io-rancher-appco-kube-state-metrics",
+      "ref": "docker.io/rancher/appco-kube-state-metrics@sha256:94c4cb1d75d8ce98d9d5136af48939e858db5dc570bcf018b781115528b8c1c8"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/appco-node-exporter:1.9.1-11.3"
+      ],
+      "id": "docker-io-rancher-appco-node-exporter",
+      "ref": "docker.io/rancher/appco-node-exporter@sha256:10b2d89d7828bde62a5ce418827c2123d6ebdbadf80466bb91654923c42130a7"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/cluster-api-controller:v1.12.7"
+      ],
+      "id": "docker-io-rancher-cluster-api-controller",
+      "ref": "docker.io/rancher/cluster-api-controller@sha256:5a8d2dedd8ec0ef5fbc1f9831f0fe864093a747883020d6ed1f20d9f7272db04"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/fleet-agent:v0.15.4"
+      ],
+      "id": "docker-io-rancher-fleet-agent",
+      "ref": "docker.io/rancher/fleet-agent@sha256:71f502ad36268d972136cce82176e7c2b59aba0da4e3ce74da48751ddbddd4d6"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/fleet:v0.15.4"
+      ],
+      "id": "docker-io-rancher-fleet",
+      "ref": "docker.io/rancher/fleet@sha256:1fb0c5b16302cb86f809d0901d44cfcf53fd3e24dd1842c9d4b55f54305efa9d"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-addon-resizer:1.8.23-build20260717"
+      ],
+      "id": "docker-io-rancher-hardened-addon-resizer",
+      "ref": "docker.io/rancher/hardened-addon-resizer@sha256:824d4f22f0a480fda6b7c16ad62abce4f584941b3fadfa1e9de8f68d279f19f5"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-calico:v3.32.1-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-calico",
+      "ref": "docker.io/rancher/hardened-calico@sha256:6b8e0510f85104b3b9a4c36404bfc331184da6417a40d67515e7565368cac482"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-cluster-autoscaler:v1.10.3-build20260717"
+      ],
+      "id": "docker-io-rancher-hardened-cluster-autoscaler",
+      "ref": "docker.io/rancher/hardened-cluster-autoscaler@sha256:5ff63c9ab53683186202898c1940431ad18de4362a9f94a4b8b63c768265e598"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-cni-plugins:v1.9.1-build20260717"
+      ],
+      "id": "docker-io-rancher-hardened-cni-plugins",
+      "ref": "docker.io/rancher/hardened-cni-plugins@sha256:e2eeda778144983b9dc2482c25872ba8ce19ba7eebc32d830791aeb33d7dd614"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-coredns:v1.14.6-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-coredns",
+      "ref": "docker.io/rancher/hardened-coredns@sha256:3bb5c254d34118a8abe7219875d98e572870ddf20181c07f2674783a7836b589"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-dns-node-cache:1.26.8-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-dns-node-cache",
+      "ref": "docker.io/rancher/hardened-dns-node-cache@sha256:82859b56f575de5995adb3ff514e7486b0643dbd26957021d762a91ad593f94a"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-etcd:v3.6.14-k3s1-build20260723"
+      ],
+      "id": "docker-io-rancher-hardened-etcd",
+      "ref": "docker.io/rancher/hardened-etcd@sha256:b8ebc2d59cafcdcfa7dc05b678df6b504565e412138f6b6aa671669e99ef930b"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-flannel:v0.28.8-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-flannel",
+      "ref": "docker.io/rancher/hardened-flannel@sha256:f255f5ac153053b59e40ab49f4a922a844c86394fda4328a78f3f0447e0ed7f2"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-k8s-metrics-server:v0.9.0-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-k8s-metrics-server",
+      "ref": "docker.io/rancher/hardened-k8s-metrics-server@sha256:1d219c3311ad683515da20ccb60abe56ec57e15ef2eb21aaeaa4f4a424e0af90"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-kubernetes:v1.35.7-rke2r1-build20260723"
+      ],
+      "id": "docker-io-rancher-hardened-kubernetes",
+      "ref": "docker.io/rancher/hardened-kubernetes@sha256:318b787bcedfb17dcb876f65e6368a0b97c1c1553ced4a6d434050fb655f1fb3"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-multus-cni:v4.3.0-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-multus-cni",
+      "ref": "docker.io/rancher/hardened-multus-cni@sha256:64e8de6a322917725e69dc671e95b0ff03f6bc2e29906b22e0efcfc90426e17a"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-multus-dynamic-networks-controller:v0.3.8-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-multus-dynamic-networks-controller",
+      "ref": "docker.io/rancher/hardened-multus-dynamic-networks-controller@sha256:709e9ed742d935fe464be05cc070adb055ff2781ded624ecb44de739314daf9d"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-multus-thick:v4.3.0-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-multus-thick",
+      "ref": "docker.io/rancher/hardened-multus-thick@sha256:bceb910f3ab82641c8656bdb3c5481b264c5e5e828f9806ab346f538b0129a1a"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-snapshot-controller:v8.6.0-build20260722"
+      ],
+      "id": "docker-io-rancher-hardened-snapshot-controller",
+      "ref": "docker.io/rancher/hardened-snapshot-controller@sha256:e95b7288b31c9d9c99bb73fbdc889b34c62a569c055661548654e863101db17b"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/hardened-whereabouts:v0.9.4-build20260721"
+      ],
+      "id": "docker-io-rancher-hardened-whereabouts",
+      "ref": "docker.io/rancher/hardened-whereabouts@sha256:888dcd3395d1e29d2dd8a73fea3b04a6a7c81562dcce3fb317f8bc2a00a246fc"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-eventrouter:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-eventrouter",
+      "ref": "docker.io/rancher/harvester-eventrouter@sha256:4174368ac2406c1b7336e4dd814773deaed09a6e9229b99ce0685e241611b607"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-kubeovn-operator:v1.15.4-r2"
+      ],
+      "id": "docker-io-rancher-harvester-kubeovn-operator",
+      "ref": "docker.io/rancher/harvester-kubeovn-operator@sha256:d0462d4ae8c047f26cee874e988bd0382ceee35b3bb4b3b4483fe3a7189a9004"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-load-balancer-webhook:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-load-balancer-webhook",
+      "ref": "docker.io/rancher/harvester-load-balancer-webhook@sha256:70280ff15e4288cb5dfdb7b1c725c91534ee75068528fc39e65a5e705dc77d82"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-load-balancer:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-load-balancer",
+      "ref": "docker.io/rancher/harvester-load-balancer@sha256:bff950ca4deb818a9f301d28fe4ec4e9e997bc7ae25a27df8b7f4223c127739b"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-network-controller:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-network-controller",
+      "ref": "docker.io/rancher/harvester-network-controller@sha256:f303842b99b96760301372365316be9a511fba6cbcd8fb2f6cb0ea1f64414dc4"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-network-helper:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-network-helper",
+      "ref": "docker.io/rancher/harvester-network-helper@sha256:81630f29e5266ebd9ef8fd5dc6ae3d4422a70918d8ed22fb92de3879d7685b3a"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-network-webhook:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-network-webhook",
+      "ref": "docker.io/rancher/harvester-network-webhook@sha256:3bdb3199afcc905a45372cc433b3c469e3c0afce4e1955bdebed8dfce2252753"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-networkfs-manager:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-networkfs-manager",
+      "ref": "docker.io/rancher/harvester-networkfs-manager@sha256:a7f0425da3f42d25cf1475eed7c59cd04dd5c1c45952eec5eb43d864ba1c2e8e"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-node-disk-manager-webhook:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-node-disk-manager-webhook",
+      "ref": "docker.io/rancher/harvester-node-disk-manager-webhook@sha256:8f0c8787c748ac023f0eb4e789b75a574654b0a766839643ec727e3f6ecb87cf"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-node-disk-manager:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-node-disk-manager",
+      "ref": "docker.io/rancher/harvester-node-disk-manager@sha256:73802e508b3c0d1c20e9c6bfc963cdcb7d82d46891c48e5bcd440eed77225654"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-node-manager-webhook:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-node-manager-webhook",
+      "ref": "docker.io/rancher/harvester-node-manager-webhook@sha256:462ca71f34b322cc243ef8ab3fd1f981ea00896ce870593af291ce52b9274105"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-node-manager:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-node-manager",
+      "ref": "docker.io/rancher/harvester-node-manager@sha256:eb1b9fc42d6458e07d575531d3463b8c2b5081119847eb04a3ceffb5c6ff0094"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-os:v1.8-20260806"
+      ],
+      "id": "docker-io-rancher-harvester-os",
+      "ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-pcidevices:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-pcidevices",
+      "ref": "docker.io/rancher/harvester-pcidevices@sha256:67fbd8c280ce9295f95142f1de373d35b19df3f7ac8a911acf16a5a5ee16694c"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-seeder:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-seeder",
+      "ref": "docker.io/rancher/harvester-seeder@sha256:bba31bf1d2c163f412f591b92d4302394e19aea95b8e801f879db5db2cda1de9"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-upgrade:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-upgrade",
+      "ref": "docker.io/rancher/harvester-upgrade@sha256:4d08815c924ff07f3e44328b1b960a47454cb11d3ae477fa237deee379786159"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-vm-import-controller:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-vm-import-controller",
+      "ref": "docker.io/rancher/harvester-vm-import-controller@sha256:962299c467069d114cfe1f94f2a6537d3b9edf78dd18cd37c605105d5f92557c"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-webhook:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester-webhook",
+      "ref": "docker.io/rancher/harvester-webhook@sha256:15effd74f96533d3d0dfe985bc22db4130e57f8721f1338d5a9190237a9a3fca"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester:v1.8.2"
+      ],
+      "id": "docker-io-rancher-harvester",
+      "ref": "docker.io/rancher/harvester@sha256:7bb99a4980106615fc6d3cd2ffbbf402528b8855a36f3f70173470713a8702fa"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/klipper-helm:v0.13.3-build20260727"
+      ],
+      "id": "docker-io-rancher-klipper-helm",
+      "ref": "docker.io/rancher/klipper-helm@sha256:5425a2b4613d2458dbdff99218e8d487ebb59c20e7a941f061c0777070f0aac1"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/klipper-lb:v0.4.17"
+      ],
+      "id": "docker-io-rancher-klipper-lb",
+      "ref": "docker.io/rancher/klipper-lb@sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/kube-webhook-certgen:v1.14.5-hardened2"
+      ],
+      "id": "docker-io-rancher-kube-webhook-certgen",
+      "ref": "docker.io/rancher/kube-webhook-certgen@sha256:6bb869baf40b92a3300c14ff591b1aa6ddb26bb4fef972e7a6a673b852eede3e"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/kubectl:v1.35.1"
+      ],
+      "id": "docker-io-rancher-kubectl",
+      "ref": "docker.io/rancher/kubectl@sha256:9e365be67e373fa097a429b6e8590caf7ddc17fb34bbea0837360619e2552916"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/kubectl:v1.32.3"
+      ],
+      "id": "docker-io-rancher-kubectl-2",
+      "ref": "docker.io/rancher/kubectl@sha256:d1ed8db58ce85e9609424d779da18c1c76effe62e9fb313d5189beb10dd7b0c9"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/kubectl:v1.34.0"
+      ],
+      "id": "docker-io-rancher-kubectl-3",
+      "ref": "docker.io/rancher/kubectl@sha256:ff3cdadeac7eae628b59debe73302bb41337098dc3f15dfb3f3c5a59b046d23c"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/kuberlr-kubectl:v6.0.0"
+      ],
+      "id": "docker-io-rancher-kuberlr-kubectl",
+      "ref": "docker.io/rancher/kuberlr-kubectl@sha256:304635c1b342a4159cf80833ad0374dd31baefbfd2bda92bec679ed584e0e7d4"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/kuberlr-kubectl:v7.1.0"
+      ],
+      "id": "docker-io-rancher-kuberlr-kubectl-2",
+      "ref": "docker.io/rancher/kuberlr-kubectl@sha256:fb6644562e7f24fec1ab13e7cdbfb6519ae4f62e212bbbedee55ccfceee7831f"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/kuberlr-kubectl:v7.0.3"
+      ],
+      "id": "docker-io-rancher-kuberlr-kubectl-3",
+      "ref": "docker.io/rancher/kuberlr-kubectl@sha256:feb136cc7f79dfba1f2ff85de4a315cf100bda9ecebd3bba3af10774aa70b2bb"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-fluent-fluent-bit:3.1.8"
+      ],
+      "id": "docker-io-rancher-mirrored-fluent-fluent-bit",
+      "ref": "docker.io/rancher/mirrored-fluent-fluent-bit@sha256:2113721429a144d504a148a0b14ec082ad28782b99ba55d5df0dde276ae22bc3"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-ingress-nginx-kube-webhook-certgen:v1.6.2"
+      ],
+      "id": "docker-io-rancher-mirrored-ingress-nginx-kube-webhook-certgen",
+      "ref": "docker.io/rancher/mirrored-ingress-nginx-kube-webhook-certgen@sha256:050a34002d5bb4966849c880c56c91f5320372564245733b33d4b3461b4dbd24"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-ingress-nginx-kube-webhook-certgen:v1.6.7"
+      ],
+      "id": "docker-io-rancher-mirrored-ingress-nginx-kube-webhook-certgen-2",
+      "ref": "docker.io/rancher/mirrored-ingress-nginx-kube-webhook-certgen@sha256:7c74a715af2c94cb734785b4d3ea1357b4f02b88e1e123c622a9cb68b62f669c"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-kube-logging-config-reloader:v0.0.6"
+      ],
+      "id": "docker-io-rancher-mirrored-kube-logging-config-reloader",
+      "ref": "docker.io/rancher/mirrored-kube-logging-config-reloader@sha256:d0b10ecd10bbc28939becbf699099c25ade91a78bd94db58708684c81e3b073e"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-kube-logging-fluentd:v1.16-4.10-full"
+      ],
+      "id": "docker-io-rancher-mirrored-kube-logging-fluentd",
+      "ref": "docker.io/rancher/mirrored-kube-logging-fluentd@sha256:07befc3e6bcfb6b0264c7f7e236eddae7b93e32844365d55ae92961b16d5e6fd"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-kube-logging-logging-operator:4.10.0"
+      ],
+      "id": "docker-io-rancher-mirrored-kube-logging-logging-operator",
+      "ref": "docker.io/rancher/mirrored-kube-logging-logging-operator@sha256:e3bf6427ddf16d3f7a092730947a14db613f8bc8044aa9c395360a4fb158c0f0"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-kube-vip-kube-vip-iptables:v1.0.4"
+      ],
+      "id": "docker-io-rancher-mirrored-kube-vip-kube-vip-iptables",
+      "ref": "docker.io/rancher/mirrored-kube-vip-kube-vip-iptables@sha256:54e6dd37dc5593083b4a35680e2f377713b9412cfbc3ed8b8f6e0753df9cb46d"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-library-busybox:1.37.0"
+      ],
+      "id": "docker-io-rancher-mirrored-library-busybox",
+      "ref": "docker.io/rancher/mirrored-library-busybox@sha256:101b4afd76732482eff9b95cae5f94bcf295e521fbec4e01b69c5421f3f3f3e5"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-library-busybox:1.36.1"
+      ],
+      "id": "docker-io-rancher-mirrored-library-busybox-2",
+      "ref": "docker.io/rancher/mirrored-library-busybox@sha256:8a45424ddf949bbe9bb3231b05f9032a45da5cd036eb4867b511b00734756d6f"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-library-nginx:1.29.1-alpine"
+      ],
+      "id": "docker-io-rancher-mirrored-library-nginx",
+      "ref": "docker.io/rancher/mirrored-library-nginx@sha256:42a516af16b852e33b7682d5ef8acbd5d13fe08fecadc7ed98605ba5e3b26ab8"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-pause:3.10.2"
+      ],
+      "id": "docker-io-rancher-mirrored-pause",
+      "ref": "docker.io/rancher/mirrored-pause@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-prometheus-adapter-prometheus-adapter:v0.12.0"
+      ],
+      "id": "docker-io-rancher-mirrored-prometheus-adapter-prometheus-adapter",
+      "ref": "docker.io/rancher/mirrored-prometheus-adapter-prometheus-adapter@sha256:680f266f0b7bc9fe8e1def4e61923591072b5d562c7e9950c7dea1771a65f22f"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-prometheus-operator-admission-webhook:v0.85.0"
+      ],
+      "id": "docker-io-rancher-mirrored-prometheus-operator-admission-webhook",
+      "ref": "docker.io/rancher/mirrored-prometheus-operator-admission-webhook@sha256:5974ff91351c03583e5c966afcd19cee65fde05cf7b122650a4018e56d4f971c"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-prometheus-operator-prometheus-config-reloader:v0.80.1"
+      ],
+      "id": "docker-io-rancher-mirrored-prometheus-operator-prometheus-config-reloader",
+      "ref": "docker.io/rancher/mirrored-prometheus-operator-prometheus-config-reloader@sha256:7d5114f24fdaaf266b5e2fab3feed2c9769342ca73c5152ecfbc553d76a5dc54"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/mirrored-prometheus-operator-prometheus-operator:v0.85.0"
+      ],
+      "id": "docker-io-rancher-mirrored-prometheus-operator-prometheus-operator",
+      "ref": "docker.io/rancher/mirrored-prometheus-operator-prometheus-operator@sha256:890b3bb05cf4ed81541922c611de8805ec9f5c1428017738a8e64e9189350e80"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/nginx-ingress-controller:v1.14.5-hardened2"
+      ],
+      "id": "docker-io-rancher-nginx-ingress-controller",
+      "ref": "docker.io/rancher/nginx-ingress-controller@sha256:6cbc1e932b5b1559e18c9890dc21ac63a07ca040286917ac53e67f1839888774"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/prom-prometheus:v3.5.0"
+      ],
+      "id": "docker-io-rancher-prom-prometheus",
+      "ref": "docker.io/rancher/prom-prometheus@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/rancher-agent:v2.14.3"
+      ],
+      "id": "docker-io-rancher-rancher-agent",
+      "ref": "docker.io/rancher/rancher-agent@sha256:58875a3be35284420b18ff4a13f38b2f3f7f25e9b119f9c0d934853f800f4a14"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/rancher-webhook:v0.10.7"
+      ],
+      "id": "docker-io-rancher-rancher-webhook",
+      "ref": "docker.io/rancher/rancher-webhook@sha256:950352603e35617aa6c80c41d1ef4030ef8724bd264a04c58610cc093dbabc1c"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/rancher:v2.14.3"
+      ],
+      "id": "docker-io-rancher-rancher",
+      "ref": "docker.io/rancher/rancher@sha256:5d0354e95d55f92da0f3c0fdcf59c07dacfe5bda886aac5273da4ca98c8c1376"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/rke2-cloud-provider:v1.35.6-0.20260610221957-158346759a70-build20260710"
+      ],
+      "id": "docker-io-rancher-rke2-cloud-provider",
+      "ref": "docker.io/rancher/rke2-cloud-provider@sha256:efee697719544875b7257739353cdcfe8910784742ef802326a3762f6668b7cf"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/rke2-runtime:v1.35.7-rke2r1"
+      ],
+      "id": "docker-io-rancher-rke2-runtime",
+      "ref": "docker.io/rancher/rke2-runtime@sha256:aed803f735972e521f5884d54b3f30ac696a98c3546622720f25b8d05cd3d894"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/shell:v0.7.1"
+      ],
+      "id": "docker-io-rancher-shell",
+      "ref": "docker.io/rancher/shell@sha256:f2326fe57fd60b11543dc04718d3fa56dad975a89b60c7550fceac9c22269a60"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/support-bundle-kit:v0.0.92"
+      ],
+      "id": "docker-io-rancher-support-bundle-kit",
+      "ref": "docker.io/rancher/support-bundle-kit@sha256:02baa824d9a4174747ab9db2635ae000b1198d2d5ed3a4c69caf28724224e783"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/system-agent-installer-rancher:v2.14.3"
+      ],
+      "id": "docker-io-rancher-system-agent-installer-rancher",
+      "ref": "docker.io/rancher/system-agent-installer-rancher@sha256:6a6e28b61e8856565b01d3515fb8254cd9f511128893238608223f7ffb0d7dae"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/system-agent-installer-rke2:v1.35.7-rke2r1"
+      ],
+      "id": "docker-io-rancher-system-agent-installer-rke2",
+      "ref": "docker.io/rancher/system-agent-installer-rke2@sha256:b41c2b53f3d083bfa406bd3aecbe9c3231710ecc9fe76a47db5555fe984c9ae7"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/system-agent:v0.14.0-suc"
+      ],
+      "id": "docker-io-rancher-system-agent",
+      "ref": "docker.io/rancher/system-agent@sha256:1869cc322d87c22cd9d1e81a4cf142904d193110803cd52570fa2cd4ea3c68f2"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/system-upgrade-controller:v0.19.1"
+      ],
+      "id": "docker-io-rancher-system-upgrade-controller",
+      "ref": "docker.io/rancher/system-upgrade-controller@sha256:e0d507b4d5db41d2b02e545d3693de16ec1f89159fcb11153e690aa5dd1d2641"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/turtles:v0.26.3"
+      ],
+      "id": "docker-io-rancher-turtles",
+      "ref": "docker.io/rancher/turtles@sha256:09836593228daaa7ab957fecadfd69532ab9832330d032d3288df6eda8d1a991"
+    },
+    {
+      "aliases": [
+        "ghcr.io/k8snetworkplumbingwg/whereabouts:v0.9.3"
+      ],
+      "id": "ghcr-io-k8snetworkplumbingwg-whereabouts",
+      "ref": "ghcr.io/k8snetworkplumbingwg/whereabouts@sha256:145241f222b8647b4eafc59944bbb80e1d068c2f7c370c739f864e4209c25a69"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/descheduler/descheduler:v0.33.0"
+      ],
+      "id": "registry-k8s-io-descheduler-descheduler",
+      "ref": "registry.k8s.io/descheduler/descheduler@sha256:de38c88dcb1e7d822c4bd320551cc55e541c160c6ba380d99772949b0c967ab0"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/snapshot-controller:v8.5.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-snapshot-controller",
+      "ref": "registry.k8s.io/sig-storage/snapshot-controller@sha256:74ca61ab13e978f03cf0f336a607281d15f04cda0a38a881306365473b28a3d8"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/bci/bci-base:16.0"
+      ],
+      "id": "registry-suse-com-bci-bci-base",
+      "ref": "registry.suse.com/bci/bci-base@sha256:5f69fcd8a54664891bb58f1f7767ac4884a67d7ab2617fa9da5fb624e13debf0"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/bci/bci-base:15.7"
+      ],
+      "id": "registry-suse-com-bci-bci-base-2",
+      "ref": "registry.suse.com/bci/bci-base@sha256:b03880998771ffd522e8808bc01a31098378f82e7c4552273e336de3742109f0"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/bci/golang:1.26"
+      ],
+      "id": "registry-suse-com-bci-golang",
+      "ref": "registry.suse.com/bci/golang@sha256:fa2dced84848f4e961e22f2b7d353d5df29fccba96c7b68c56b1bf495ac5dea1"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/cdi-apiserver:1.64.0-150700.9.11.1"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-cdi-apiserver",
+      "ref": "registry.suse.com/suse/sles/15.7/cdi-apiserver@sha256:e3b553cc2eac3133cdb735520c89c5ffe621f087bc53938dc73bba235fdf3e8e"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/cdi-cloner:1.64.0-150700.9.11.1"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-cdi-cloner",
+      "ref": "registry.suse.com/suse/sles/15.7/cdi-cloner@sha256:f7dce0d566fa8bacdfcc7ef6fcdb3326b1b54452daa2048e6274d8bc0c51415f"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/cdi-controller:1.64.0-150700.9.11.1"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-cdi-controller",
+      "ref": "registry.suse.com/suse/sles/15.7/cdi-controller@sha256:82924c9e8edaac9d3a260c7f80b522193d9eab4cc0bf479b23729b0a6ab12a3a"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/cdi-importer:1.64.0-150700.9.11.1"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-cdi-importer",
+      "ref": "registry.suse.com/suse/sles/15.7/cdi-importer@sha256:b4dd90438965dd94eac4d3dee45f7b9d259ecd4d838fb5fcb5f4037ad5e2a674"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/cdi-operator:1.64.0-150700.9.11.1"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-cdi-operator",
+      "ref": "registry.suse.com/suse/sles/15.7/cdi-operator@sha256:778f8f69f9428ba090c728cecfd94345c7ab2ef9ca9297a14889ea3ef74bf193"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/cdi-uploadproxy:1.64.0-150700.9.11.1"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-cdi-uploadproxy",
+      "ref": "registry.suse.com/suse/sles/15.7/cdi-uploadproxy@sha256:04b95b3a7ea124763c76c9d64559b2145908e131c03ef7d6ac63754b7cb440a9"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/cdi-uploadserver:1.64.0-150700.9.11.1"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-cdi-uploadserver",
+      "ref": "registry.suse.com/suse/sles/15.7/cdi-uploadserver@sha256:6f4fd9d271462566669c7903cc5368958ea37e0772232bd404def0f30a664c50"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/libguestfs-tools:1.7.4-150700.3.24.2"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-libguestfs-tools",
+      "ref": "registry.suse.com/suse/sles/15.7/libguestfs-tools@sha256:a93f5a0342eebc4f361a4fadfcf7d452ea80af6eff600e95bbcf61f392edba4c"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/virt-api:1.7.4-150700.3.24.2"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-virt-api",
+      "ref": "registry.suse.com/suse/sles/15.7/virt-api@sha256:d2c194a5e929236b50e86bdbd6b73a3246b1ffadd16647e92cd0b55e40dfbc12"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/virt-controller:1.7.4-150700.3.24.2"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-virt-controller",
+      "ref": "registry.suse.com/suse/sles/15.7/virt-controller@sha256:81fa5782d3af047edc53249135c59d951cfdbac779fd5549c39db5a1a0d011bd"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/virt-handler:1.7.4-150700.3.24.2"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-virt-handler",
+      "ref": "registry.suse.com/suse/sles/15.7/virt-handler@sha256:eb27c9db09658f4b4b3822976fea32408d755bdb217d844843ecd6f09b1cce6f"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/virt-launcher:1.7.4-150700.3.24.2"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-virt-launcher",
+      "ref": "registry.suse.com/suse/sles/15.7/virt-launcher@sha256:7c7cb55f4cff3cd709aa09703c5f0ff04a911f06b543b3eebdbe293ac1e802cb"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/sles/15.7/virt-operator:1.7.4-150700.3.24.2"
+      ],
+      "id": "registry-suse-com-suse-sles-15-7-virt-operator",
+      "ref": "registry.suse.com/suse/sles/15.7/virt-operator@sha256:481d4161c95d25ff6efc2e001fc50890bef22714405e047da79feb5c4621f828"
+    },
+    {
+      "aliases": [
+        "registry.suse.com/suse/vmdp/vmdp:2.5.5"
+      ],
+      "id": "registry-suse-com-suse-vmdp-vmdp",
+      "ref": "registry.suse.com/suse/vmdp/vmdp@sha256:088430e0b0ca01972d7faa3072fa7c48daed85a1539fc2f2180c8463f9419f17"
+    }
+  ],
+  "resolved_alias_count": 116,
+  "resolver": "docker buildx imagetools inspect",
+  "review_required": true,
+  "schema": "layersentry.container-image-lock-candidate/v1",
+  "source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c",
+  "unresolved_alias_count": 0
+}

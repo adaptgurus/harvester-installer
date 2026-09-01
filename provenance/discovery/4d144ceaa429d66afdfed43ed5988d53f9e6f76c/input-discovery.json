@@ -1,0 +1,82 @@
+{
+  "captured_at": "2026-09-01T14:40:19Z",
+  "downloaded_inputs": [
+    {
+      "id": "helm-v3.20.0-linux-amd64.tar.gz",
+      "sha256": "dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286",
+      "size": 17455024,
+      "source": "https://get.helm.sh/helm-v3.20.0-linux-amd64.tar.gz"
+    },
+    {
+      "id": "longhorn-images-v1.11.2.txt",
+      "sha256": "be6ca8ebe839ac706905c78b2551075382a0dd38e83731664f370b82da2888d8",
+      "size": 562,
+      "source": "https://raw.githubusercontent.com/longhorn/longhorn/v1.11.2/deploy/longhorn-images.txt"
+    },
+    {
+      "id": "rke2-images-multus.linux-amd64.txt",
+      "sha256": "2d118341646538c9298782671ae0b6b97f60c5b118cc9f3b394ea87a1c5c652d",
+      "size": 373,
+      "source": "https://github.com/rancher/rke2/releases/download/v1.35.7+rke2r1/rke2-images-multus.linux-amd64.txt"
+    },
+    {
+      "id": "rke2-images.linux-amd64.txt",
+      "sha256": "4233722b84f17e2debdf8a4781acf6600f057e2e1faff6a47a18fb3a3aa44d77",
+      "size": 1008,
+      "source": "https://github.com/rancher/rke2/releases/download/v1.35.7+rke2r1/rke2-images.linux-amd64.txt"
+    },
+    {
+      "id": "wharfie-amd64",
+      "sha256": "e6b5d27e5b5815ece828e3d2f4012ccec1e40dceb4e639815d6cdbc0f22e2fa8",
+      "size": 47194264,
+      "source": "https://github.com/rancher/wharfie/releases/download/v0.6.8/wharfie-amd64"
+    }
+  ],
+  "release_approved": false,
+  "release_identity": {
+    "embedded_platform": "Harvester v1.8.2",
+    "product": "LayerSentry v1.0"
+  },
+  "review_required": true,
+  "runner_observation": {
+    "curl": "curl 8.5.0 (x86_64-pc-linux-gnu) libcurl/8.5.0 OpenSSL/3.0.13 zlib/1.3 brotli/1.1.0 zstd/1.5.5 libidn2/2.3.7 libpsl/0.21.2 (+libidn2/2.3.7) libssh/0.10.6/openssl/zlib nghttp2/1.59.0 librtmp/2.3 OpenLDAP/2.6.10",
+    "docker": "Docker version 28.0.4, build b8034c0",
+    "docker_buildx": "github.com/docker/buildx v0.36.1 1d8dde89b8aba914e05e45366770736fea1fd690",
+    "git": "git version 2.55.0",
+    "image_os": "ubuntu24",
+    "image_version": "20260823.283.1",
+    "kernel": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
+  "schema": "layersentry.provenance-discovery/v1",
+  "source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c",
+  "source_commits": {
+    "harvester": "5320dfa6770f63406750e7c64b24ed87c543e6ad",
+    "harvester_addons": "f60d73d894e00f18d5e11cd21a301ed1b016631c"
+  },
+  "verified_tool_artifacts": [
+    {
+      "id": "yq-linux-amd64",
+      "sha256": "75d893a0d5940d1019cb7cdc60001d9e876623852c31cfc6267047bc31149fa9",
+      "source": "https://github.com/mikefarah/yq/releases/download/v4.52.5/yq_linux_amd64",
+      "version": "v4.52.5"
+    },
+    {
+      "id": "helm-linux-amd64",
+      "sha256": "dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286",
+      "source": "https://get.helm.sh/helm-v3.20.0-linux-amd64.tar.gz",
+      "version": "v3.20.0"
+    },
+    {
+      "id": "wharfie-amd64",
+      "sha256": "e6b5d27e5b5815ece828e3d2f4012ccec1e40dceb4e639815d6cdbc0f22e2fa8",
+      "source": "https://github.com/rancher/wharfie/releases/download/v0.6.8/wharfie-amd64",
+      "version": "v0.6.8"
+    }
+  ],
+  "versions": {
+    "longhorn": "v1.11.2",
+    "rancher": "v2.14.3",
+    "rke2": "v1.35.7+rke2r1"
+  }
+}
