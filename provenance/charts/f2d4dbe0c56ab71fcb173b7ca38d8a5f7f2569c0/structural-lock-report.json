@@ -1,0 +1,25 @@
+{
+  "eligible_for_full_offline_build": false,
+  "errors": [],
+  "git_context": {
+    "source_branch": "layersentry-v1.0-dev",
+    "source_commit": "f2d4dbe0c56ab71fcb173b7ca38d8a5f7f2569c0"
+  },
+  "lock_file": "/home/runner/work/harvester-installer/harvester-installer/provenance/layersentry-v1.0-harvester-v1.8.2.lock.json",
+  "lock_sha256": "81246cd893e32c2a46d408431a812466022d6fa79b13e00ed14978b7f8839961",
+  "lock_status": "incomplete",
+  "release_identity": {
+    "embedded_platform": {
+      "artifact_namespace": "harvester/v1.8.2",
+      "name": "Harvester",
+      "version": "v1.8.2"
+    },
+    "product": {
+      "artifact_namespace": "layersentry/v1.0",
+      "name": "LayerSentry",
+      "version": "v1.0"
+    }
+  },
+  "schema": "layersentry.provenance-gate-report/v1",
+  "warnings": []
+}

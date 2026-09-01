@@ -1,5 +1,189 @@
 {
-  "charts": [],
+  "charts": [
+    {
+      "archive": "harvester-1.8.2.tgz",
+      "bytes": 211226,
+      "id": "harvester",
+      "name": "harvester",
+      "sha256": "1fa70b9f5f0cc276467f55f2899198c54e032aa3a0320ca06bfd0bc4e405692e",
+      "source": "git+https://github.com/harvester/harvester.git@5320dfa6770f63406750e7c64b24ed87c543e6ad#deploy/charts/harvester",
+      "transformations": [
+        "scripts/patch-harvester",
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.8.2"
+    },
+    {
+      "archive": "harvester-crd-1.8.2.tgz",
+      "bytes": 120317,
+      "id": "harvester-crd",
+      "name": "harvester-crd",
+      "sha256": "accbb17392a4697292c091364b832fe6cd8389c8c48836215038b3c6d6d8d89c",
+      "source": "git+https://github.com/harvester/harvester.git@5320dfa6770f63406750e7c64b24ed87c543e6ad#deploy/charts/harvester-crd",
+      "transformations": [
+        "scripts/patch-harvester",
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.8.2"
+    },
+    {
+      "archive": "rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
+      "bytes": 186531,
+      "id": "rancher-monitoring-crd",
+      "name": "rancher-monitoring-crd",
+      "sha256": "96f88c8cb3f2f88cfd0e4bf49c19999168cebac293d86b64a9adfdc8c42d6045",
+      "source": "https://charts.rancher.io/assets/rancher-monitoring-crd/rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
+      "source_bytes": 186349,
+      "source_sha256": "8af022dc9c86a4582d4fbe8a4aa36e8dd2844d05fb203eafdf6ea34d6459f5b7",
+      "transformations": [
+        "addons:patch-rancher-monitoring-crd",
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up77.9.1-rancher.11"
+    },
+    {
+      "archive": "rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
+      "bytes": 457882,
+      "id": "rancher-monitoring",
+      "name": "rancher-monitoring",
+      "sha256": "0eef71f9c744173af0e627e63f89026b2ae2c6abb799def96faf1c32e02a0bee",
+      "source": "https://charts.rancher.io/assets/rancher-monitoring/rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
+      "source_bytes": 464293,
+      "source_sha256": "f8efb9e3ee01dee73c389c3893cf4dc4716065f6bb413e4fab7f7cfffd29bbe3",
+      "transformations": [
+        "addons:patch-rancher-monitoring",
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up77.9.1-rancher.11"
+    },
+    {
+      "archive": "rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
+      "bytes": 163347,
+      "id": "rancher-logging-crd",
+      "name": "rancher-logging-crd",
+      "sha256": "456b6683e85e7272e4cae9c32ec903bbd0f8654bfab4a44841e7470634a090b9",
+      "source": "https://charts.rancher.io/assets/rancher-logging-crd/rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
+      "source_bytes": 175027,
+      "source_sha256": "df6be1b90c1ec4bf832d49bd4095819d5678a95411ddcf643004c714e6c8efae",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up4.10.0-rancher.18"
+    },
+    {
+      "archive": "rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
+      "bytes": 19175,
+      "id": "rancher-logging",
+      "name": "rancher-logging",
+      "sha256": "da3a897f8c345cc7a1a7931ea8e4ea10e7cef2656d1dd56dacbd9299dfd0077f",
+      "source": "https://charts.rancher.io/assets/rancher-logging/rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
+      "source_bytes": 19302,
+      "source_sha256": "0321c132aadd1c2ef9b6e5b0fd0d0e92186d0d0b92ba5bbc7e24eb7b11ac41fb",
+      "transformations": [
+        "addons:patch-rancher-logging",
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up4.10.0-rancher.18"
+    },
+    {
+      "archive": "harvester-vm-import-controller-1.8.2.tgz",
+      "bytes": 2672,
+      "id": "harvester-vm-import-controller",
+      "name": "harvester-vm-import-controller",
+      "sha256": "63055cb221f3ca27efdb23609be3936c205c38ddb56d9159c8036c59769a2cef",
+      "source": "https://github.com/harvester/charts/releases/download/harvester-vm-import-controller-1.8.2/harvester-vm-import-controller-1.8.2.tgz",
+      "source_bytes": 2722,
+      "source_sha256": "63e34f9d08e6994e43db3406091e37c89d089b3845839e23d8c99c2690fb8d7f",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.8.2"
+    },
+    {
+      "archive": "harvester-pcidevices-controller-1.8.2.tgz",
+      "bytes": 2777,
+      "id": "harvester-pcidevices-controller",
+      "name": "harvester-pcidevices-controller",
+      "sha256": "166a03ab2415cc8cbbaede929ee820a68d9159bfb6496ee2586f10b9bdfc6b40",
+      "source": "https://github.com/harvester/charts/releases/download/harvester-pcidevices-controller-1.8.2/harvester-pcidevices-controller-1.8.2.tgz",
+      "source_bytes": 2816,
+      "source_sha256": "ef3027f5529942bcc961539a77520e17266f2b7111cbd85d89c8fbd69453ef5f",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.8.2"
+    },
+    {
+      "archive": "harvester-seeder-1.8.2.tgz",
+      "bytes": 2933,
+      "id": "harvester-seeder",
+      "name": "harvester-seeder",
+      "sha256": "dddfb0b24d81622edb8b319142cad91aa2b6cfa432948f99817af34dc035590a",
+      "source": "https://github.com/harvester/charts/releases/download/harvester-seeder-1.8.2/harvester-seeder-1.8.2.tgz",
+      "source_bytes": 2979,
+      "source_sha256": "1e07b36d3ff1f8ee3a527150447773dd6c63abc406c9c35df28a32d506e099ed",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.8.2"
+    },
+    {
+      "archive": "nvidia-driver-runtime-1.8.2.tgz",
+      "bytes": 2748,
+      "id": "nvidia-driver-runtime",
+      "name": "nvidia-driver-runtime",
+      "sha256": "af0a6269713accae25602e9a26c5eada0840d61dff43d822e24ceb05a1e600ac",
+      "source": "https://github.com/harvester/charts/releases/download/nvidia-driver-runtime-1.8.2/nvidia-driver-runtime-1.8.2.tgz",
+      "source_bytes": 2765,
+      "source_sha256": "106a082f1571774e91b26a6ce75d2517e9890478d79ae957a00710d9d87abb01",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.8.2"
+    },
+    {
+      "archive": "kubeovn-operator-crd-1.15.4-r2.tgz",
+      "bytes": 4187,
+      "id": "kubeovn-operator-crd",
+      "name": "kubeovn-operator-crd",
+      "sha256": "90e0d9b7f208d23e97d56b7faeb8b2fe1045dd3975aae46b98755a88f51b77cd",
+      "source": "https://github.com/harvester/charts/releases/download/kubeovn-operator-crd-1.15.4-r2/kubeovn-operator-crd-1.15.4-r2.tgz",
+      "source_bytes": 4327,
+      "source_sha256": "8efcfdd3fde5fd17e6fc80e951f5e7b03243fcc517cdde52bbf0ef8f5b32475d",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.15.4-r2"
+    },
+    {
+      "archive": "kubeovn-operator-1.15.4-r2.tgz",
+      "bytes": 6163,
+      "id": "kubeovn-operator",
+      "name": "kubeovn-operator",
+      "sha256": "9db6fce8abe832d44b5925c74a4ca16f97c061352614078a51b10c7cdec0229a",
+      "source": "https://github.com/harvester/charts/releases/download/kubeovn-operator-1.15.4-r2/kubeovn-operator-1.15.4-r2.tgz",
+      "source_bytes": 6233,
+      "source_sha256": "d8705f7168271662b623af4ca2d3c4f2f4b868410e09b39385b38658af394b1f",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.15.4-r2"
+    },
+    {
+      "archive": "descheduler-0.33.0.tgz",
+      "bytes": 8686,
+      "id": "descheduler",
+      "name": "descheduler",
+      "sha256": "250ff86d4435e5192f10f532636e433bb78990627a9a2ad6f20adf44c0a345b2",
+      "source": "https://github.com/kubernetes-sigs/descheduler/releases/download/descheduler-helm-chart-0.33.0/descheduler-0.33.0.tgz",
+      "source_bytes": 8973,
+      "source_sha256": "1f32da32dedc6c066f197637e1fbd10546e9c6987322b88e71add1c9765c978f",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "0.33.0"
+    }
+  ],
   "ci_actions": [
     {
       "uses": "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
@@ -872,6 +1056,16 @@
       "version": "v1.0"
     }
   },
+  "reviewed_chart_discovery": {
+    "addons_commit": "f60d73d894e00f18d5e11cd21a301ed1b016631c",
+    "candidate_sha256": "785880fcaa2c31b33407d1e31ef3514a4c4f57fbd141b189132e60f589ebac3a",
+    "chart_count": 13,
+    "harvester_commit": "5320dfa6770f63406750e7c64b24ed87c543e6ad",
+    "plan_sha256": "4c90b74c5a8dcddc86da930b06c1a51e49f55944c981a24a43493f5739d938f4",
+    "source_commit": "f2d4dbe0c56ab71fcb173b7ca38d8a5f7f2569c0",
+    "source_date_epoch": 1786031931,
+    "status": "charts-reviewed-lock-still-incomplete"
+  },
   "reviewed_discovery": {
     "image_alias_count": 116,
     "image_alias_inventory_sha256": "6b222c84084744c71abae13bef85fcba3c6392eca5a436db144844253214046a",
@@ -946,11 +1140,6 @@
       "required_resolution": "External registry aliases are digest-locked. Capture and verify locally generated harvester-cluster-repo, installer and OS image identities in the deterministic build evidence, then prove final ISO image-list coverage.",
       "review_report": "provenance/reviews/4d144ceaa429d66afdfed43ed5988d53f9e6f76c/external-image-review.json",
       "reviewed_discovery_source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c"
-    },
-    {
-      "id": "embedded-helm-chart-set",
-      "kind": "chart-set",
-      "required_resolution": "Enumerate each embedded chart with immutable version, source URL, and SHA-256 archive checksum."
     },
     {
       "id": "harvester-os-and-package-inputs",

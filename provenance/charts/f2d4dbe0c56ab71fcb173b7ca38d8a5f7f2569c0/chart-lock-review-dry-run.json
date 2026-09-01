@@ -1,0 +1,21 @@
+{
+  "applied": false,
+  "candidate_sha256": "785880fcaa2c31b33407d1e31ef3514a4c4f57fbd141b189132e60f589ebac3a",
+  "chart_count": 13,
+  "lock_status": "incomplete",
+  "plan_sha256": "4c90b74c5a8dcddc86da930b06c1a51e49f55944c981a24a43493f5739d938f4",
+  "production_lock_complete": false,
+  "release_approved": false,
+  "remaining_unresolved_count": 6,
+  "remaining_unresolved_ids": [
+    "build-toolchain",
+    "harvester-offline-image-set",
+    "harvester-os-and-package-inputs",
+    "layersentry-controller-image",
+    "layersentry-full-offline-builder-image",
+    "syft-sbom-generator"
+  ],
+  "removed_unresolved_id": "embedded-helm-chart-set",
+  "schema": "layersentry.chart-lock-review/v1",
+  "source_commit": "f2d4dbe0c56ab71fcb173b7ca38d8a5f7f2569c0"
+}

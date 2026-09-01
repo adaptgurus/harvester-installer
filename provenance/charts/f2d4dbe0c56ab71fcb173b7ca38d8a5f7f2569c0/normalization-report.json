@@ -1,0 +1,98 @@
+{
+  "chart_count": 13,
+  "charts": [
+    {
+      "bytes": 8686,
+      "changed": true,
+      "path": "final-charts/descheduler-0.33.0.tgz",
+      "sha256": "250ff86d4435e5192f10f532636e433bb78990627a9a2ad6f20adf44c0a345b2",
+      "sha256_before": "1f32da32dedc6c066f197637e1fbd10546e9c6987322b88e71add1c9765c978f"
+    },
+    {
+      "bytes": 211226,
+      "changed": true,
+      "path": "final-charts/harvester-1.8.2.tgz",
+      "sha256": "1fa70b9f5f0cc276467f55f2899198c54e032aa3a0320ca06bfd0bc4e405692e",
+      "sha256_before": "1828af72a53af4318da0d25b833637c81ee3f4596073ad9c37198a5a50302c37"
+    },
+    {
+      "bytes": 120317,
+      "changed": true,
+      "path": "final-charts/harvester-crd-1.8.2.tgz",
+      "sha256": "accbb17392a4697292c091364b832fe6cd8389c8c48836215038b3c6d6d8d89c",
+      "sha256_before": "01c48701777dafaf99e3f42777c5a48cacbdd654fbdf23ccca57ee1aa82d8530"
+    },
+    {
+      "bytes": 2777,
+      "changed": true,
+      "path": "final-charts/harvester-pcidevices-controller-1.8.2.tgz",
+      "sha256": "166a03ab2415cc8cbbaede929ee820a68d9159bfb6496ee2586f10b9bdfc6b40",
+      "sha256_before": "ef3027f5529942bcc961539a77520e17266f2b7111cbd85d89c8fbd69453ef5f"
+    },
+    {
+      "bytes": 2933,
+      "changed": true,
+      "path": "final-charts/harvester-seeder-1.8.2.tgz",
+      "sha256": "dddfb0b24d81622edb8b319142cad91aa2b6cfa432948f99817af34dc035590a",
+      "sha256_before": "1e07b36d3ff1f8ee3a527150447773dd6c63abc406c9c35df28a32d506e099ed"
+    },
+    {
+      "bytes": 2672,
+      "changed": true,
+      "path": "final-charts/harvester-vm-import-controller-1.8.2.tgz",
+      "sha256": "63055cb221f3ca27efdb23609be3936c205c38ddb56d9159c8036c59769a2cef",
+      "sha256_before": "63e34f9d08e6994e43db3406091e37c89d089b3845839e23d8c99c2690fb8d7f"
+    },
+    {
+      "bytes": 6163,
+      "changed": true,
+      "path": "final-charts/kubeovn-operator-1.15.4-r2.tgz",
+      "sha256": "9db6fce8abe832d44b5925c74a4ca16f97c061352614078a51b10c7cdec0229a",
+      "sha256_before": "d8705f7168271662b623af4ca2d3c4f2f4b868410e09b39385b38658af394b1f"
+    },
+    {
+      "bytes": 4187,
+      "changed": true,
+      "path": "final-charts/kubeovn-operator-crd-1.15.4-r2.tgz",
+      "sha256": "90e0d9b7f208d23e97d56b7faeb8b2fe1045dd3975aae46b98755a88f51b77cd",
+      "sha256_before": "8efcfdd3fde5fd17e6fc80e951f5e7b03243fcc517cdde52bbf0ef8f5b32475d"
+    },
+    {
+      "bytes": 2748,
+      "changed": true,
+      "path": "final-charts/nvidia-driver-runtime-1.8.2.tgz",
+      "sha256": "af0a6269713accae25602e9a26c5eada0840d61dff43d822e24ceb05a1e600ac",
+      "sha256_before": "106a082f1571774e91b26a6ce75d2517e9890478d79ae957a00710d9d87abb01"
+    },
+    {
+      "bytes": 19175,
+      "changed": true,
+      "path": "final-charts/rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
+      "sha256": "da3a897f8c345cc7a1a7931ea8e4ea10e7cef2656d1dd56dacbd9299dfd0077f",
+      "sha256_before": "3ebe2897518cba234cf31afcef70965907499889a72c4b3c894bae4f988d185b"
+    },
+    {
+      "bytes": 163347,
+      "changed": true,
+      "path": "final-charts/rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
+      "sha256": "456b6683e85e7272e4cae9c32ec903bbd0f8654bfab4a44841e7470634a090b9",
+      "sha256_before": "df6be1b90c1ec4bf832d49bd4095819d5678a95411ddcf643004c714e6c8efae"
+    },
+    {
+      "bytes": 457882,
+      "changed": true,
+      "path": "final-charts/rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
+      "sha256": "0eef71f9c744173af0e627e63f89026b2ae2c6abb799def96faf1c32e02a0bee",
+      "sha256_before": "70d23edb68ed9d5fc4e85948ac2284528aecb8a82e91f85b91838d12968cf74b"
+    },
+    {
+      "bytes": 186531,
+      "changed": true,
+      "path": "final-charts/rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
+      "sha256": "96f88c8cb3f2f88cfd0e4bf49c19999168cebac293d86b64a9adfdc8c42d6045",
+      "sha256_before": "8af022dc9c86a4582d4fbe8a4aa36e8dd2844d05fb203eafdf6ea34d6459f5b7"
+    }
+  ],
+  "schema": "layersentry.deterministic-chart-normalization/v1",
+  "source_date_epoch": 1786031931
+}

@@ -1,0 +1,13 @@
+250ff86d4435e5192f10f532636e433bb78990627a9a2ad6f20adf44c0a345b2  final-charts/descheduler-0.33.0.tgz
+1fa70b9f5f0cc276467f55f2899198c54e032aa3a0320ca06bfd0bc4e405692e  final-charts/harvester-1.8.2.tgz
+accbb17392a4697292c091364b832fe6cd8389c8c48836215038b3c6d6d8d89c  final-charts/harvester-crd-1.8.2.tgz
+166a03ab2415cc8cbbaede929ee820a68d9159bfb6496ee2586f10b9bdfc6b40  final-charts/harvester-pcidevices-controller-1.8.2.tgz
+dddfb0b24d81622edb8b319142cad91aa2b6cfa432948f99817af34dc035590a  final-charts/harvester-seeder-1.8.2.tgz
+63055cb221f3ca27efdb23609be3936c205c38ddb56d9159c8036c59769a2cef  final-charts/harvester-vm-import-controller-1.8.2.tgz
+9db6fce8abe832d44b5925c74a4ca16f97c061352614078a51b10c7cdec0229a  final-charts/kubeovn-operator-1.15.4-r2.tgz
+90e0d9b7f208d23e97d56b7faeb8b2fe1045dd3975aae46b98755a88f51b77cd  final-charts/kubeovn-operator-crd-1.15.4-r2.tgz
+af0a6269713accae25602e9a26c5eada0840d61dff43d822e24ceb05a1e600ac  final-charts/nvidia-driver-runtime-1.8.2.tgz
+da3a897f8c345cc7a1a7931ea8e4ea10e7cef2656d1dd56dacbd9299dfd0077f  final-charts/rancher-logging-108.0.2+up4.10.0-rancher.18.tgz
+456b6683e85e7272e4cae9c32ec903bbd0f8654bfab4a44841e7470634a090b9  final-charts/rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz
+0eef71f9c744173af0e627e63f89026b2ae2c6abb799def96faf1c32e02a0bee  final-charts/rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz
+96f88c8cb3f2f88cfd0e4bf49c19999168cebac293d86b64a9adfdc8c42d6045  final-charts/rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz
