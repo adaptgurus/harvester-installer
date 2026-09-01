@@ -73,7 +73,7 @@ jobs:
 
           python3 scripts/layersentry-ui-flow-update.py
 
-      - name: Disable network installer artifact
+      - name: Enforce full-offline ISO only
         shell: bash
         run: |
           python3 - <<'PY'
@@ -81,6 +81,7 @@ jobs:
 
           path = Path("scripts/package-harvester-os")
           text = path.read_text()
+
           marker = "DISABLE_BUILD_NET_INSTALL_ISO=true"
           if marker not in text:
               anchor = 'VERSION_FILE="version.yaml"\n'
@@ -91,6 +92,14 @@ jobs:
                   anchor + '\n# LayerSentry releases the full offline ISO only.\nDISABLE_BUILD_NET_INSTALL_ISO=true\n',
                   1,
               )
+
+          old_gate = 'if [ "${ARCH}" == "amd64" ]\nthen\n# Use dd to create empty image'
+          new_gate = 'if [ "${ARCH}" == "amd64" ] && [ "${DISABLE_BUILD_NET_INSTALL_ISO}" != "true" ]\nthen\n# Use dd to create empty image'
+          if new_gate not in text:
+              if text.count(old_gate) != 1:
+                  raise SystemExit("unable to locate native v1.8.2 net-install gate")
+              text = text.replace(old_gate, new_gate, 1)
+
           path.write_text(text)
           PY
 
@@ -112,6 +121,11 @@ jobs:
           grep -F 'PRETTY_NAME="LayerSentry 1.0"' scripts/package-harvester-os
           grep -F 'BASE_OS_RELEASE_NAME="Harvester ${HARVESTER_VERSION}"' scripts/package-harvester-os
           grep -F 'os: ${BASE_OS_RELEASE_NAME}' scripts/package-harvester-os
+
+          # Full offline ISO only: preserve the native block but make the
+          # net-install branch unreachable when LayerSentry policy is enabled.
+          grep -F 'DISABLE_BUILD_NET_INSTALL_ISO=true' scripts/package-harvester-os
+          grep -F 'if [ "${ARCH}" == "amd64" ] && [ "${DISABLE_BUILD_NET_INSTALL_ISO}" != "true" ]' scripts/package-harvester-os
 
           # Guard the native v1.8.2 packaging pipeline from accidental truncation.
           grep -F 'INITRD=$(docker run --rm ${HARVESTER_OS_IMAGE} readlink -f /boot/initrd)' scripts/package-harvester-os
