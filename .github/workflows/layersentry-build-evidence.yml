@@ -34,13 +34,25 @@ jobs:
       SOURCE_ARTIFACT_NAME: ${{ github.event.inputs.source_artifact_name || 'layersentry-v1.0-harvester-v1.8.2-amd64-offline-iso' }}
       EXPECTED_SOURCE_COMMIT: a104eab8cc5eca42b7ef002fc96561a21be3f163
       EXPECTED_ARTIFACT_ID: "9790788698"
-      EXPECTED_ARTIFACT_SHA256: 6fae4189304997926268b39d5641ed82333325b585432034c19074623909d9a3
+      EXPECTED_ARTIFACT_SHA256: 905247f635dc45e37f999b4999297a5adef5b0b4b518702879bd0d6767ddcdba
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout evidence workflow source
         uses: actions/checkout@v4
         with:
           ref: feat/layersentry-v1.8.2-production
           fetch-depth: 1
+
+      - name: Validate retained artifact identity
+        shell: bash
+        run: |
+          set -euxo pipefail
+          artifact_name=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${EXPECTED_ARTIFACT_ID}" --jq '.name')
+          artifact_digest=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${EXPECTED_ARTIFACT_ID}" --jq '.digest')
+          artifact_expired=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${EXPECTED_ARTIFACT_ID}" --jq '.expired')
+          test "$artifact_name" = "$SOURCE_ARTIFACT_NAME"
+          test "$artifact_digest" = "sha256:${EXPECTED_ARTIFACT_SHA256}"
+          test "$artifact_expired" = "false"
 
       - name: Download successful production ISO candidate
         uses: actions/download-artifact@v4
@@ -105,7 +117,7 @@ jobs:
 
           xorriso -osirrox on \
             -indev "$iso" \
-            -extract /bundle/harvester/images-lists/harvester-images-v1.0.txt qualified-evidence/harvester-images-v1.0.txt
+            -extract /bundle/harvester/images-lists qualified-evidence/image-lists
 
           cmp -s "$packaged_release_metadata" qualified-evidence/harvester-release.from-iso.yaml
 
@@ -116,13 +128,15 @@ jobs:
           grep -F 'rancher: v2.14.3' qualified-evidence/harvester-release.from-iso.yaml
           grep -F 'kubevirt: 1.7.4-150700.3.24.2' qualified-evidence/harvester-release.from-iso.yaml
 
-          grep -F 'docker.io/rancher/harvester:v1.8.2' qualified-evidence/harvester-images-v1.0.txt
-          grep -F 'docker.io/rancher/harvester-webhook:v1.8.2' qualified-evidence/harvester-images-v1.0.txt
-          grep -F 'docker.io/rancher/harvester-upgrade:v1.8.2' qualified-evidence/harvester-images-v1.0.txt
-          grep -F 'docker.io/longhornio/longhorn-manager:v1.11.3' qualified-evidence/harvester-images-v1.0.txt
+          harvester_image_list=qualified-evidence/image-lists/harvester-images-v1.0.txt
+          test -f "$harvester_image_list"
+          grep -F 'docker.io/rancher/harvester:v1.8.2' "$harvester_image_list"
+          grep -F 'docker.io/rancher/harvester-webhook:v1.8.2' "$harvester_image_list"
+          grep -F 'docker.io/rancher/harvester-upgrade:v1.8.2' "$harvester_image_list"
+          grep -R -F 'docker.io/longhornio/longhorn-manager:v1.11.3' qualified-evidence/image-lists
 
-          if grep -E 'rancher/(harvester|harvester-webhook|harvester-upgrade):v1\.8-head|0\.0\.0-v1\.8-[0-9a-f]{8}|Harvester [0-9a-f]{8}' \
-            qualified-evidence/harvester-images-v1.0.txt qualified-evidence/harvester-release.from-iso.yaml; then
+          if grep -RE 'rancher/(harvester|harvester-webhook|harvester-upgrade):v1\.8-head|0\.0\.0-v1\.8-[0-9a-f]{8}|Harvester [0-9a-f]{8}' \
+            qualified-evidence/image-lists qualified-evidence/harvester-release.from-iso.yaml; then
             echo 'Development Harvester provenance was found in the production ISO candidate'
             exit 1
           fi
@@ -156,6 +170,11 @@ jobs:
             byteCountMatches: true
             embeddedReleaseMetadataMatchesPackagedEvidence: true
             harvesterRelease: v1.8.2
+            harvesterChartRelease: 1.8.2
+            rke2Release: v1.35.7+rke2r1
+            rancherRelease: v2.14.3
+            kubeVirtRelease: 1.7.4-150700.3.24.2
+            longhornManagerRelease: v1.11.3
             harvesterDevelopmentRefsAbsent: true
             fullOfflineIso: true
             netInstallIsoGenerated: false
@@ -177,7 +196,7 @@ jobs:
           EOF
 
           cat qualified-evidence/build-qualification.yaml
-          find qualified-evidence -maxdepth 2 -type f -printf '%f\t%s bytes\n' | sort
+          find qualified-evidence -maxdepth 3 -type f -printf '%p\t%s bytes\n' | sort
 
           {
             echo '# LayerSentry production ISO build qualification'
@@ -190,6 +209,7 @@ jobs:
             echo '- Harvester: `v1.8.2`'
             echo '- RKE2: `v1.35.7+rke2r1`'
             echo '- Rancher: `v2.14.3`'
+            echo '- Longhorn manager: `v1.11.3`'
             echo '- Development Harvester refs: absent'
             echo '- Remaining: boot, installation, air-gap, recovery and release gates'
           } >> "$GITHUB_STEP_SUMMARY"
