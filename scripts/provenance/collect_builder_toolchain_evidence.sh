@@ -20,7 +20,7 @@ fail() {
 [[ $(git -C "$TOP_DIR" rev-parse HEAD) == "$SOURCE_COMMIT" ]] \
   || fail "checked-out source does not equal requested source commit"
 
-for command in docker python3 git sha256sum stat; do
+for command in docker python3 git sha256sum stat mktemp; do
   command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
 done
 
@@ -28,17 +28,30 @@ OUTPUT_DIR=$(mkdir -p "$OUTPUT_DIR" && cd "$OUTPUT_DIR" && pwd)
 rm -rf "$OUTPUT_DIR"/*
 docker pull --platform linux/amd64 "$BUILDER_REF" >/dev/null
 
-python3 - "$BUILDER_REF" "$SOURCE_COMMIT" "$OUTPUT_DIR/image-inspect.json" <<'PY'
+inspect_raw=$(mktemp "${RUNNER_TEMP:-/tmp}/layersentry-builder-inspect.XXXXXX.json")
+cleanup() {
+  rm -f "$inspect_raw"
+}
+trap cleanup EXIT INT TERM
+
+docker image inspect "$BUILDER_REF" > "$inspect_raw"
+[[ -s "$inspect_raw" ]] || fail "docker image inspect returned empty output for $BUILDER_REF"
+
+python3 - \
+  "$BUILDER_REF" \
+  "$SOURCE_COMMIT" \
+  "$inspect_raw" \
+  "$OUTPUT_DIR/image-inspect.json" <<'PY'
 import json
-import subprocess
 import sys
 from pathlib import Path
 
-ref, source_commit, output = sys.argv[1:]
-values = json.loads(
-    subprocess.check_output(["docker", "image", "inspect", ref], text=True)
-)
-if len(values) != 1:
+ref, source_commit, raw_path, output = sys.argv[1:]
+try:
+    values = json.loads(Path(raw_path).read_text(encoding="utf-8"))
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"docker image inspect returned invalid JSON: {exc}") from exc
+if not isinstance(values, list) or len(values) != 1:
     raise SystemExit("docker image inspect did not return exactly one builder image")
 item = values[0]
 if item.get("Os") != "linux" or item.get("Architecture") != "amd64":
@@ -76,15 +89,20 @@ Path(output).write_text(
 )
 PY
 
-docker run --rm --network none --platform linux/amd64 \
-  --entrypoint /bin/bash "$BUILDER_REF" -s > "$OUTPUT_DIR/rpm-packages.tsv" <<'EOS'
+docker run --rm --network none --platform linux/amd64 -i \
+  --entrypoint /bin/bash "$BUILDER_REF" -s \
+  > "$OUTPUT_DIR/rpm-packages.tsv" <<'EOS'
 set -Eeuo pipefail
 printf 'name\tepoch\tversion\trelease\tarch\tvendor\tbuild_time\n'
 rpm -qa --qf '%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{VENDOR}\t%{BUILDTIME}\n' \
   | LC_ALL=C sort -t $'\t' -k1,1 -k2,2 -k3,3 -k4,4 -k5,5
 EOS
+[[ -s "$OUTPUT_DIR/rpm-packages.tsv" ]] \
+  || fail "builder RPM inventory is empty"
+[[ $(wc -l < "$OUTPUT_DIR/rpm-packages.tsv") -gt 20 ]] \
+  || fail "builder RPM inventory is unexpectedly small"
 
-docker run --rm --network none --platform linux/amd64 \
+docker run --rm --network none --platform linux/amd64 -i \
   --entrypoint python3 "$BUILDER_REF" - "$BUILDER_REF" \
   > "$OUTPUT_DIR/toolchain.json" <<'PY'
 from __future__ import annotations
@@ -197,6 +215,25 @@ document = {
 }
 print(json.dumps(document, indent=2, sort_keys=True))
 PY
+[[ -s "$OUTPUT_DIR/toolchain.json" ]] \
+  || fail "builder toolchain inventory is empty"
+python3 - "$OUTPUT_DIR/toolchain.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    inventory = json.loads(path.read_text(encoding="utf-8"))
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"builder toolchain inventory is invalid JSON: {exc}") from exc
+if inventory.get("schema") != "layersentry.builder-toolchain-inventory/v1":
+    raise SystemExit("builder toolchain inventory has an unexpected schema")
+if inventory.get("tool_count") != 25:
+    raise SystemExit(
+        f"builder toolchain inventory contains {inventory.get('tool_count')} tools; expected 25"
+    )
+PY
 
 (
   cd "$TOP_DIR"
@@ -218,6 +255,8 @@ PY
     printf '%s\t%s\t%s\n' "$path" "$(stat -c '%s' "$path")" "$(sha256sum "$path" | awk '{print $1}')"
   done
 ) > "$OUTPUT_DIR/source-inputs.tsv"
+[[ -s "$OUTPUT_DIR/source-inputs.tsv" ]] \
+  || fail "builder source-input inventory is empty"
 
 python3 - \
   "$BUILDER_REF" \
