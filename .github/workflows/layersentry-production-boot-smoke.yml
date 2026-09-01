@@ -1,0 +1,116 @@
+name: LayerSentry exact production ISO UEFI boot capture
+
+on:
+  push:
+    branches:
+      - feat/layersentry-v1.8.2-production
+    paths:
+      - .github/workflows/layersentry-production-boot-smoke.yml
+      - scripts/capture-production-iso-boot-smoke.sh
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: layersentry-v1.8.2-exact-iso-uefi-boot-capture
+  cancel-in-progress: false
+
+jobs:
+  capture-runtime-uefi-boot-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      SOURCE_RUN_ID: "33479776571"
+      SOURCE_ARTIFACT_ID: "9790788698"
+      SOURCE_ARTIFACT_NAME: layersentry-v1.0-harvester-v1.8.2-amd64-offline-iso
+      SOURCE_ARTIFACT_ARCHIVE_BYTES: "8180147214"
+      SOURCE_ARTIFACT_ARCHIVE_SHA256: 905247f635dc45e37f999b4999297a5adef5b0b4b518702879bd0d6767ddcdba
+      SOURCE_COMMIT: a104eab8cc5eca42b7ef002fc96561a21be3f163
+      EXPECTED_ISO_BYTES: "8180137984"
+      EXPECTED_ISO_SHA512: 7f1cd57c363f3b6b592fcbfb90d810c8f12f881e14e097fe17b2833250ee9e57a9831e4398147bd612bc7e3a36a4c45751019473e60eeaa263e5660c996feb81
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout boot-capture harness
+        uses: actions/checkout@v4
+        with:
+          ref: feat/layersentry-v1.8.2-production
+          fetch-depth: 1
+
+      - name: Validate exact retained ISO artifact identity
+        shell: bash
+        run: |
+          set -euxo pipefail
+          artifact_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}")
+          test "$(jq -r '.name' <<<"$artifact_json")" = "$SOURCE_ARTIFACT_NAME"
+          test "$(jq -r '.size_in_bytes' <<<"$artifact_json")" = "$SOURCE_ARTIFACT_ARCHIVE_BYTES"
+          test "$(jq -r '.digest' <<<"$artifact_json")" = "sha256:${SOURCE_ARTIFACT_ARCHIVE_SHA256}"
+          test "$(jq -r '.expired' <<<"$artifact_json")" = "false"
+          test "$(jq -r '.workflow_run.id' <<<"$artifact_json")" = "$SOURCE_RUN_ID"
+          bash -n scripts/capture-production-iso-boot-smoke.sh
+
+      - name: Download exact BUILD_GOOD ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: exact-iso-candidate
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Install OVMF and QEMU capture tooling
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ovmf \
+            qemu-system-x86 \
+            qemu-utils \
+            python3-pil
+          qemu-system-x86_64 --version
+          qemu-img --version
+          find /usr/share/OVMF -maxdepth 1 -type f -printf '%f\t%s bytes\n' | sort
+
+      - name: Boot exact ISO and capture staged runtime evidence
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p boot-smoke-evidence
+          bash scripts/capture-production-iso-boot-smoke.sh \
+            exact-iso-candidate \
+            boot-smoke-evidence
+
+      - name: Summarize captured evidence boundary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '# LayerSentry exact ISO UEFI boot capture'
+            echo
+            echo "- Source artifact ID: \`${SOURCE_ARTIFACT_ID}\`"
+            echo "- Source ISO SHA-512: \`${EXPECTED_ISO_SHA512}\`"
+            if [ -f boot-smoke-evidence/boot-smoke-capture.yaml ]; then
+              echo '- Capture harness: completed'
+              echo '- Promotion state: `RUNTIME_BOOT_EVIDENCE_CAPTURED_REVIEW_REQUIRED`'
+              echo '- `BOOT_SMOKE_GOOD`: not automatically granted'
+              echo
+              echo '```yaml'
+              cat boot-smoke-evidence/boot-smoke-capture.yaml
+              echo '```'
+            else
+              echo '- Capture harness: did not complete'
+              echo '- Review QEMU logs and any partial screenshots in the evidence artifact'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload runtime boot-smoke evidence for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-harvester-v1.8.2-uefi-boot-capture-source-run-${{ env.SOURCE_RUN_ID }}
+          path: boot-smoke-evidence/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 9
