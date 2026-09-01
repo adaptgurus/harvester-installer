@@ -15,7 +15,7 @@ fi
 if [[ ! "${_harvester_expected_commit}" =~ ^[0-9a-f]{40}$ ]]; then
     _harvester_version_fail "expected commit must be exactly 40 lowercase hex characters" || return 1
 fi
-if [ ! -d "${_harvester_repo}/.git" ]; then
+if ! git -C "${_harvester_repo}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     _harvester_version_fail "${_harvester_repo} is not a Git work tree" || return 1
 fi
 
@@ -56,11 +56,35 @@ if [ -n "$(git -C "${_harvester_repo}" status --porcelain --untracked-files=no)"
     _harvester_version_fail "locked Harvester source has tracked modifications" || return 1
 fi
 
-HARVESTER_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${VERSION}")
-HARVESTER_APP_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${APP_VERSION}")
-HARVESTER_CHART_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${CHART_VERSION}")
-HARVESTER_KUBEVIRT_VERSION=$(yq e '.kubevirt-operator.containers.operator.image.tag' "${_harvester_repo}/deploy/charts/harvester/values.yaml")
-HARVESTER_MIN_UPGRADABLE_VERSION=$(cd "${_harvester_repo}"; source ./scripts/version &> /dev/null; echo "${MIN_UPGRADABLE_VERSION}")
+# Harvester's upstream scripts/version intentionally reads optional shell
+# variables such as SPRINT_RELEASE without defining them first. Evaluate that
+# upstream script in a fresh Bash process with nounset disabled so a caller's
+# `set -u` cannot silently change release-version semantics. Keep errexit on,
+# expose resolver failures on stderr, and emit one machine-readable record.
+_harvester_arch=${ARCH-}
+_harvester_metadata=$(
+    cd "${_harvester_repo}" &&
+    ARCH="${_harvester_arch}" bash -c '
+        set -e
+        set +u
+        source ./scripts/version >/dev/null
+        printf "%s\t%s\t%s\t%s\n" \
+            "$VERSION" "$APP_VERSION" "$CHART_VERSION" "$MIN_UPGRADABLE_VERSION"
+    '
+) || {
+    _harvester_version_fail "upstream Harvester version resolver failed" || return 1
+}
+IFS=$'\t' read -r \
+    HARVESTER_VERSION \
+    HARVESTER_APP_VERSION \
+    HARVESTER_CHART_VERSION \
+    HARVESTER_MIN_UPGRADABLE_VERSION <<< "${_harvester_metadata}"
+
+HARVESTER_KUBEVIRT_VERSION=$(yq e \
+    '.kubevirt-operator.containers.operator.image.tag' \
+    "${_harvester_repo}/deploy/charts/harvester/values.yaml") || {
+    _harvester_version_fail "cannot resolve the pinned KubeVirt image version" || return 1
+}
 
 if [ "${HARVESTER_VERSION}" != "${_harvester_expected_ref}" ]; then
     _harvester_version_fail \
@@ -77,10 +101,13 @@ if [ "${HARVESTER_CHART_VERSION}" != "${_harvester_expected_ref#v}" ]; then
         "upstream chart resolver produced ${HARVESTER_CHART_VERSION}, expected ${_harvester_expected_ref#v}" \
         || return 1
 fi
+if [ -z "${HARVESTER_MIN_UPGRADABLE_VERSION}" ]; then
+    _harvester_version_fail "minimum upgradable version is empty for ${_harvester_expected_ref}" || return 1
+fi
 if [[ "${HARVESTER_VERSION} ${HARVESTER_APP_VERSION} ${HARVESTER_CHART_VERSION}" =~ (^|[-[:space:]])head($|[-[:space:]]) ]]; then
     _harvester_version_fail "head-derived release identity is forbidden" || return 1
 fi
 
 unset _harvester_repo _harvester_expected_ref _harvester_expected_commit
-unset _harvester_actual_commit _harvester_tag_commit
+unset _harvester_actual_commit _harvester_tag_commit _harvester_arch _harvester_metadata
 unset -f _harvester_version_fail
