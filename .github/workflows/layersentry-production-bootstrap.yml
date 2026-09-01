@@ -57,9 +57,6 @@ jobs:
         run: |
           set -euxo pipefail
 
-          # Correct the original transform draft's missing tab escape before the
-          # askOptionsFunc marker. Keep the correction in the script so the
-          # generated commit is reproducible on subsequent runs.
           python3 - <<'PY'
           from pathlib import Path
           path = Path("scripts/layersentry-transform.py")
@@ -97,15 +94,31 @@ jobs:
           path.write_text(text)
           PY
 
-      - name: Validate LayerSentry installer policy
+      - name: Validate LayerSentry installer and provenance policy
         shell: bash
         run: |
           set -euxo pipefail
 
+          # User-visible installer policy.
           grep -F 'NTPServers: "time.google.com",' pkg/console/install_panels.go
           grep -F 'VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster.' pkg/console/install_panels.go
+
+          # Reproducible Harvester/add-on source pins.
           grep -F 'load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2' scripts/build-bundle
           grep -F 'git clone --branch v1.8.2 --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester' scripts/build-bundle
+          grep -F 'load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2' scripts/package-harvester-os
+
+          # Product version and upstream base provenance must not be conflated.
+          grep -F 'PRETTY_NAME="LayerSentry 1.0"' scripts/package-harvester-os
+          grep -F 'BASE_OS_RELEASE_NAME="Harvester ${HARVESTER_VERSION}"' scripts/package-harvester-os
+          grep -F 'os: ${BASE_OS_RELEASE_NAME}' scripts/package-harvester-os
+
+          # Guard the native v1.8.2 packaging pipeline from accidental truncation.
+          grep -F 'INITRD=$(docker run --rm ${HARVESTER_OS_IMAGE} readlink -f /boot/initrd)' scripts/package-harvester-os
+          grep -F 'elemental build-iso --config-dir "${CONFIG_DIR}" --debug "docker:${HARVESTER_OS_IMAGE}"' scripts/package-harvester-os
+          grep -F 'sha512sum ${PROJECT_PREFIX}* > $CHECKSUM_FILE' scripts/package-harvester-os
+          grep -F 'kind: Version' scripts/package-harvester-os
+          grep -F 'harvester-images-list-${ARCH}.txt' scripts/package-harvester-os
 
           python3 - <<'PY'
           from pathlib import Path
