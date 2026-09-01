@@ -38,7 +38,13 @@ jobs:
           # The reviewed full-offline source baseline must remain in history.
           git merge-base --is-ancestor 49e533b1afbaaa08f0611090a4c09f2a6c6098ed HEAD
 
-          # Exact upstream source pins.
+          # Exact immutable upstream release pins.
+          grep -F 'HARVESTER_REF="v1.8.2"' scripts/build
+          grep -F 'HARVESTER_COMMIT="5320dfa6770f63406750e7c64b24ed87c543e6ad"' scripts/build
+          grep -F 'ADDONS_REF="v1.8.2"' scripts/build
+          grep -F 'ADDONS_COMMIT="f60d73d894e00f18d5e11cd21a301ed1b016631c"' scripts/build
+          grep -F 'git clone --branch ${HARVESTER_REF} --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester' scripts/build
+          grep -F 'load_and_source_addon ${addons_path} https://github.com/harvester/addons.git ${ADDONS_REF}' scripts/build
           grep -F 'load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2' scripts/build-bundle
           grep -F 'git clone --branch v1.8.2 --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester' scripts/build-bundle
           grep -F 'load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2' scripts/package-harvester-os
@@ -53,7 +59,7 @@ jobs:
           grep -F 'DISABLE_BUILD_NET_INSTALL_ISO=true' scripts/package-harvester-os
           grep -F 'if [ "${ARCH}" == "amd64" ] && [ "${DISABLE_BUILD_NET_INSTALL_ISO}" != "true" ]' scripts/package-harvester-os
 
-          # NTP must remain user-editable.
+          # NTP keeps a connected-install starting value but must remain editable.
           python3 - <<'PY'
           from pathlib import Path
           text = Path("pkg/console/install_panels.go").read_text()
@@ -115,12 +121,29 @@ jobs:
           xorriso -osirrox on \
             -indev "$release_iso" \
             -extract /harvester-release.yaml dist/layersentry-production/iso-metadata/harvester-release.yaml
+          xorriso -osirrox on \
+            -indev "$release_iso" \
+            -extract /bundle/harvester/images-lists/harvester-images-v1.0.txt dist/layersentry-production/iso-metadata/harvester-images-v1.0.txt
 
           cat dist/layersentry-production/iso-metadata/harvester-release.yaml
           grep -F 'harvester: v1.8.2' dist/layersentry-production/iso-metadata/harvester-release.yaml
+          grep -F 'harvesterChart: 1.8.2' dist/layersentry-production/iso-metadata/harvester-release.yaml
           grep -F 'os: Harvester v1.8.2' dist/layersentry-production/iso-metadata/harvester-release.yaml
           grep -F 'kubernetes: v1.35.7+rke2r1' dist/layersentry-production/iso-metadata/harvester-release.yaml
           grep -F 'rancher: v2.14.3' dist/layersentry-production/iso-metadata/harvester-release.yaml
+          grep -F 'kubevirt: 1.7.4-150700.3.24.2' dist/layersentry-production/iso-metadata/harvester-release.yaml
+
+          image_list=dist/layersentry-production/iso-metadata/harvester-images-v1.0.txt
+          grep -F 'docker.io/rancher/harvester:v1.8.2' "$image_list"
+          grep -F 'docker.io/rancher/harvester-webhook:v1.8.2' "$image_list"
+          grep -F 'docker.io/rancher/harvester-upgrade:v1.8.2' "$image_list"
+          grep -F 'docker.io/longhornio/longhorn-manager:v1.11.3' "$image_list"
+
+          if grep -E 'rancher/(harvester|harvester-webhook|harvester-upgrade):v1\.8-head|0\.0\.0-v1\.8-[0-9a-f]{8}|Harvester [0-9a-f]{8}' \
+            "$image_list" dist/layersentry-production/iso-metadata/harvester-release.yaml; then
+            echo 'Development Harvester provenance was found in the production ISO candidate'
+            exit 1
+          fi
 
           source_commit=$(cat dist/layersentry-production/source-commit.txt)
           iso_bytes=$(cat "${release_iso}.bytes")
@@ -144,7 +167,11 @@ jobs:
             filename: layersentry-v1.0-harvester-v1.8.2-amd64.iso
             bytes: ${iso_bytes}
             sha512: ${iso_sha512}
-            classification: BUILD_GOOD_CANDIDATE
+            classification: BUILD_GOOD
+          verified:
+            embeddedReleaseMetadata: true
+            releaseImageTags: true
+            developmentHarvesterRefsAbsent: true
           policy:
             fullOfflineIso: true
             netInstallIsoGenerated: false
@@ -154,13 +181,24 @@ jobs:
           EOF
 
           cat dist/layersentry-production/build-manifest.yaml
-          ls -lh dist/layersentry-production
+          ls -lh dist/layersentry-production dist/layersentry-production/iso-metadata
 
-          if [ -f dist/artifacts/harvester-images-list-amd64.txt ]; then
-            cp dist/artifacts/harvester-images-list-amd64.txt dist/layersentry-production/
-          fi
+      - name: Upload compact auditable build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-harvester-v1.8.2-build-evidence
+          path: |
+            dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso.sha512
+            dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso.bytes
+            dist/layersentry-production/source-commit.txt
+            dist/layersentry-production/build-manifest.yaml
+            dist/layersentry-production/iso-metadata/harvester-release.yaml
+            dist/layersentry-production/iso-metadata/harvester-images-v1.0.txt
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
 
-      - name: Upload stable LayerSentry production ISO evidence
+      - name: Upload stable LayerSentry production ISO candidate
         uses: actions/upload-artifact@v4
         with:
           name: layersentry-v1.0-harvester-v1.8.2-amd64-offline-iso
@@ -168,10 +206,6 @@ jobs:
             dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso
             dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso.sha512
             dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso.bytes
-            dist/layersentry-production/source-commit.txt
-            dist/layersentry-production/build-manifest.yaml
-            dist/layersentry-production/iso-metadata/harvester-release.yaml
-            dist/layersentry-production/harvester-images-list-amd64.txt
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
