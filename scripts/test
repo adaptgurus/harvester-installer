@@ -1,25 +1,32 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
 TOP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd )"
-cd ${TOP_DIR}
+cd "${TOP_DIR}"
 
 SCRIPTS_DIR="${TOP_DIR}/scripts"
-source ${SCRIPTS_DIR}/lib/addon
+source "${SCRIPTS_DIR}/lib/addon"
 
-addons_path=${TOP_DIR}/../addons
-load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8
+addons_path="${TOP_DIR}/../addons"
+ADDONS_COMMIT="f60d73d894e00f18d5e11cd21a301ed1b016631c"
+load_and_source_addon "${addons_path}" https://github.com/harvester/addons.git "${ADDONS_COMMIT}"
 
-generate_addon ${addons_path}
+actual_addons_commit=$(git -C "${addons_path}" rev-parse HEAD)
+if [[ "${actual_addons_commit}" != "${ADDONS_COMMIT}" ]]; then
+  echo "Harvester add-ons source mismatch: expected ${ADDONS_COMMIT}, found ${actual_addons_commit}" >&2
+  exit 1
+fi
+
+generate_addon "${addons_path}"
 # copy the generated addon yamls to installer
-cp ${addons_path}/*.yaml ./pkg/config/templates
+cp "${addons_path}"/*.yaml ./pkg/config/templates
 
 echo "All existing template files"
 ls -alth ./pkg/config/templates
 echo "The templated rancherd-22-addons.yaml file"
 cat ./pkg/config/templates/rancherd-22-addons.yaml
 
-cd ${TOP_DIR}
+cd "${TOP_DIR}"
 
 echo "Running tests"
 go test -cover -tags=test ./pkg/...
