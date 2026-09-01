@@ -107,7 +107,9 @@ for record in 'kernel:/boot/vmlinuz' 'initrd:/boot/initrd'; do
 done
 EOS
 
-# Canonical regular-file and symlink manifest for a filesystem tree.
+# Canonical regular-file and symlink manifest for a filesystem tree. A present
+# but empty tree is represented explicitly as an absent wildcard so an empty
+# repository directory remains deterministic evidence rather than a blank file.
 manifest_tree() {
   local requested=$1
   local output=$2
@@ -121,7 +123,9 @@ if [[ -z "$root" || ! -d "$root" ]]; then
   printf 'absent\t%s\t-\t-\n' "$requested"
   exit 0
 fi
+entry_count=0
 while IFS= read -r -d '' path; do
+  entry_count=$((entry_count + 1))
   [[ "$path" != *$'\t'* && "$path" != *$'\n'* && "$path" != *$'\r'* ]]
   if [[ -L "$path" ]]; then
     target=$(readlink "$path")
@@ -133,6 +137,9 @@ while IFS= read -r -d '' path; do
     printf 'file\t%s\t%s\t%s\n' "$path" "$bytes" "$checksum"
   fi
 done < <(find "$root" -xdev \( -type f -o -type l \) -print0 | LC_ALL=C sort -z)
+if [[ $entry_count -eq 0 ]]; then
+  printf 'absent\t%s/*\t-\t-\n' "${root%/}"
+fi
 EOS
 }
 
