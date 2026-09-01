@@ -57,13 +57,14 @@ jobs:
         run: |
           set -euxo pipefail
 
-          # Older transform drafts contained a guarded regex marker that can be
-          # represented differently by Python escaping. Normalize it before use.
+          # Correct the original transform draft's missing tab escape before the
+          # askOptionsFunc marker. Keep the correction in the script so the
+          # generated commit is reproducible on subsequent runs.
           python3 - <<'PY'
           from pathlib import Path
           path = Path("scripts/layersentry-transform.py")
           text = path.read_text()
-          text = text.replace("taskOptionsFunc", "askOptionsFunc")
+          text = text.replace(r"\askOptionsFunc", r"\taskOptionsFunc")
           path.write_text(text)
           PY
 
@@ -111,8 +112,8 @@ jobs:
 
           text = Path("pkg/console/install_panels.go").read_text()
 
-          # NTP must remain an editable input. The default is only a starting
-          # value; the operator can enter an approved/local server.
+          # NTP remains an editable installer input. The default is a starting
+          # value only; the operator can replace it with an approved/local NTP.
           ntp_start = text.index("func addNTPServersPanel")
           ntp_block = text[ntp_start:]
           for marker in (
