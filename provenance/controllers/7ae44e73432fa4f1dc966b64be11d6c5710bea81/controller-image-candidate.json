@@ -1,0 +1,123 @@
+{
+  "binary": {
+    "bytes": 6844542,
+    "path": "layersentry-controller-linux-amd64",
+    "sha256": "ba85473f9cf56031d3fc490a33169c6594343c8d3153eb166eb840b14cb71aed"
+  },
+  "build_epoch": 1788294480,
+  "bundled": true,
+  "cmd": [
+    "--listen",
+    "0.0.0.0:9443"
+  ],
+  "controller_image": {
+    "aliases": [
+      "ghcr.io/adaptgurus/layersentry-controller:v1.0.0",
+      "ghcr.io/adaptgurus/layersentry-controller:source-7ae44e73432fa4f1dc966b64be11d6c5710bea81"
+    ],
+    "id": "layersentry-controller",
+    "ref": "ghcr.io/adaptgurus/layersentry-controller@sha256:b2be65c279c48964389ab5ff80fbe610d20080d6a2779ab1cfb78f7e59d2aac7"
+  },
+  "entrypoint": [
+    "/usr/local/bin/layersentry-controller"
+  ],
+  "image_config_digest": "c99289c049abf17363dc7a5106ad2672cf8ed8aba31f6230ca5c943a4696431d",
+  "image_labels": {
+    "io.layersentry.embedded-platform": "Harvester",
+    "io.layersentry.embedded-platform-version": "v1.8.2",
+    "io.layersentry.lifecycle": "BUNDLED_NOT_INSTALLED",
+    "io.layersentry.product": "LayerSentry",
+    "io.layersentry.product-version": "v1.0",
+    "io.layersentry.release-approved": "false",
+    "io.layersentry.runtime-qualified": "false",
+    "org.opencontainers.image.created": "1788294480",
+    "org.opencontainers.image.description": "Read-only LayerSentry v1.0 bootstrap-validation API for embedded Harvester v1.8.2",
+    "org.opencontainers.image.revision": "7ae44e73432fa4f1dc966b64be11d6c5710bea81",
+    "org.opencontainers.image.source": "https://github.com/adaptgurus/harvester-installer",
+    "org.opencontainers.image.title": "LayerSentry bootstrap controller",
+    "org.opencontainers.image.version": "v1.0.0"
+  },
+  "installed": false,
+  "platform": "linux/amd64",
+  "release_approved": false,
+  "release_identity": {
+    "embedded_platform": "Harvester v1.8.2",
+    "product": "LayerSentry v1.0"
+  },
+  "rootfs_diff_ids": [
+    "sha256:b94b2dbb18755d20ba287686aebef3d2a31fef1ae13ee159389f484bd01a1137"
+  ],
+  "runtime_qualified": false,
+  "runtime_user": "65532:65532",
+  "sbom": {
+    "bytes": 4293,
+    "format": "SPDX JSON",
+    "path": "controller-sbom.spdx.json",
+    "sha256": "5b03e5f1e9c617f6a13fc8b98e0b0d6b6d64e1fc8aefc9d7d0b9d1ad772d1b9d"
+  },
+  "schema": "layersentry.controller-image-candidate/v1",
+  "source_commit": "7ae44e73432fa4f1dc966b64be11d6c5710bea81",
+  "source_inputs": [
+    {
+      "bytes": 3266,
+      "path": "go.mod",
+      "sha256": "11e237bcba63b4102aaaad567d5048e8db0898919a7b7c81d818962e6b59ae03"
+    },
+    {
+      "bytes": 19427,
+      "path": "cmd/layersentry-controller/main.go",
+      "sha256": "1781fcb43591062e5dabba649143bd4a9e6283a6bc719a3f022fc0386a54df00"
+    },
+    {
+      "bytes": 4316,
+      "path": "cmd/layersentry-controller/main_test.go",
+      "sha256": "2dc6d43731f0e6991164e89705dafb87e4d10451d3f52dc8f7c9bb7a309aaf08"
+    },
+    {
+      "bytes": 1327,
+      "path": "package/layersentry-controller/Dockerfile",
+      "sha256": "752d18cd176d9191031c516895716042e0107c49dc909e2111892d216df58816"
+    },
+    {
+      "bytes": 1507,
+      "path": "package/layersentry-controller/README.md",
+      "sha256": "75bad7dca33165b4fba7e04529f9726b23eacf95c5fab6508f8cf7fc4f6b4196"
+    },
+    {
+      "bytes": 20496,
+      "path": "scripts/build-layersentry-controller",
+      "sha256": "b543cdb1fd4dd41a5f3cd9e4b0eef9567f7b3152a89b2b0257b092c3788a01cd"
+    },
+    {
+      "bytes": 1182,
+      "path": "scripts/default",
+      "sha256": "a2f993330cda9f37876be26613bb99ca9e680c184edc3478dcaa6461249b76e0"
+    },
+    {
+      "bytes": 171,
+      "path": "scripts/images/harvester-additional-images.txt",
+      "sha256": "7cb974c77745a4662483e486450707341139e1052b886c5e1f426fd01420beb0"
+    },
+    {
+      "bytes": 15638,
+      "path": "scripts/provenance/review_controller_image.py",
+      "sha256": "a054e73e5649654aa56225c375895248a9942d015ab40945641c2eb7da27d966"
+    },
+    {
+      "bytes": 15779,
+      "path": "scripts/provenance/verify_controller_binding.py",
+      "sha256": "15bb458892ee6b5643f8dc4cbd01d670b75f70bc2d9897e08d514fa4e10a2a89"
+    },
+    {
+      "bytes": 7100,
+      "path": "tests/test_controller_image_lock.py",
+      "sha256": "0dcd39c6a7b6e420ef0abadcc5d1928d33179d9ccee5c5be72d82e365f2f5719"
+    },
+    {
+      "bytes": 11278,
+      "path": ".github/workflows/layersentry-v1.0-controller-lock.yml",
+      "sha256": "02b9c9673984549ee4e75f66819d3c3edd371c5f34db4eacd53cd5f7f9e9d2a8"
+    }
+  ],
+  "version": "v1.0.0"
+}

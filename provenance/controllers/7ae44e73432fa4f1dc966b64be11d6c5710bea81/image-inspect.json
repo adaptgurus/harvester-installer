@@ -1,0 +1,35 @@
+{
+  "architecture": "amd64",
+  "config": {
+    "cmd": [
+      "--listen",
+      "0.0.0.0:9443"
+    ],
+    "entrypoint": [
+      "/usr/local/bin/layersentry-controller"
+    ],
+    "labels": {
+      "io.layersentry.embedded-platform": "Harvester",
+      "io.layersentry.embedded-platform-version": "v1.8.2",
+      "io.layersentry.lifecycle": "BUNDLED_NOT_INSTALLED",
+      "io.layersentry.product": "LayerSentry",
+      "io.layersentry.product-version": "v1.0",
+      "io.layersentry.release-approved": "false",
+      "io.layersentry.runtime-qualified": "false",
+      "org.opencontainers.image.created": "1788294480",
+      "org.opencontainers.image.description": "Read-only LayerSentry v1.0 bootstrap-validation API for embedded Harvester v1.8.2",
+      "org.opencontainers.image.revision": "7ae44e73432fa4f1dc966b64be11d6c5710bea81",
+      "org.opencontainers.image.source": "https://github.com/adaptgurus/harvester-installer",
+      "org.opencontainers.image.title": "LayerSentry bootstrap controller",
+      "org.opencontainers.image.version": "v1.0.0"
+    },
+    "user": "65532:65532",
+    "working_dir": "/"
+  },
+  "id": "sha256:c99289c049abf17363dc7a5106ad2672cf8ed8aba31f6230ca5c943a4696431d",
+  "os": "linux",
+  "rootfs_layers": [
+    "sha256:b94b2dbb18755d20ba287686aebef3d2a31fef1ae13ee159389f484bd01a1137"
+  ],
+  "rootfs_type": "layers"
+}

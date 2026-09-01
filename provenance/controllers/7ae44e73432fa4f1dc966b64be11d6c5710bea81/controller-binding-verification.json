@@ -1,0 +1,15 @@
+{
+  "bundled": true,
+  "error_count": 0,
+  "errors": [],
+  "image_ref": "ghcr.io/adaptgurus/layersentry-controller@sha256:b2be65c279c48964389ab5ff80fbe610d20080d6a2779ab1cfb78f7e59d2aac7",
+  "installed": false,
+  "lock": "provenance/layersentry-v1.0-harvester-v1.8.2.lock.json",
+  "release_approved": false,
+  "repo_root": "/home/runner/work/harvester-installer/harvester-installer",
+  "runtime_alias": "ghcr.io/adaptgurus/layersentry-controller:v1.0.0",
+  "runtime_qualified": false,
+  "schema": "layersentry.controller-binding-verification/v1",
+  "source_commit": "7ae44e73432fa4f1dc966b64be11d6c5710bea81",
+  "verified": true
+}
