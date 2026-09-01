@@ -1,0 +1,66 @@
+name: LayerSentry Hyper-V lab inventory
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - scripts/collect-hyperv-lab-inventory.ps1
+      - .github/workflows/layersentry-hyperv-lab-inventory.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layersentry-hyperv-inventory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inventory:
+    name: Inventory real Hyper-V host and existing LayerSentry VMs
+    runs-on: [self-hosted, Windows, X64, layersentry-hyperv]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact inventory source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Parse inventory script
+        shell: powershell
+        run: |
+          $path = "scripts/collect-hyperv-lab-inventory.ps1"
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path -LiteralPath $path),
+              [ref]$tokens,
+              [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+          }
+          Write-Host "PowerShell parser accepted $path"
+
+      - name: Collect non-destructive Hyper-V inventory
+        shell: powershell
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "layersentry-hyperv-inventory"
+          & "scripts/collect-hyperv-lab-inventory.ps1" `
+              -EvidenceDirectory $evidence `
+              -ExpectedVmNames @("sen1", "sen2", "sen3")
+          Get-Content -LiteralPath (Join-Path $evidence "SUMMARY.md")
+
+      - name: Upload Hyper-V inventory evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-hyperv-inventory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}\layersentry-hyperv-inventory\**
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
