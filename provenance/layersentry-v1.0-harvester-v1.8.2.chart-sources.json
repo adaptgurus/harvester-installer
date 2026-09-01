@@ -1,0 +1,198 @@
+{
+  "schema": "layersentry.chart-source-plan/v1",
+  "release_identity": {
+    "product": "LayerSentry v1.0",
+    "embedded_platform": "Harvester v1.8.2"
+  },
+  "source_locks": {
+    "harvester": {
+      "repository": "https://github.com/harvester/harvester.git",
+      "commit": "5320dfa6770f63406750e7c64b24ed87c543e6ad",
+      "release_ref": "v1.8.2"
+    },
+    "addons": {
+      "repository": "https://github.com/harvester/addons.git",
+      "commit": "f60d73d894e00f18d5e11cd21a301ed1b016631c"
+    }
+  },
+  "charts": [
+    {
+      "id": "harvester",
+      "name": "harvester",
+      "version": "1.8.2",
+      "archive": "harvester-1.8.2.tgz",
+      "source": {
+        "kind": "git",
+        "repository": "https://github.com/harvester/harvester.git",
+        "commit": "5320dfa6770f63406750e7c64b24ed87c543e6ad",
+        "path": "deploy/charts/harvester"
+      },
+      "transformations": [
+        "scripts/patch-harvester",
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "harvester-crd",
+      "name": "harvester-crd",
+      "version": "1.8.2",
+      "archive": "harvester-crd-1.8.2.tgz",
+      "source": {
+        "kind": "git",
+        "repository": "https://github.com/harvester/harvester.git",
+        "commit": "5320dfa6770f63406750e7c64b24ed87c543e6ad",
+        "path": "deploy/charts/harvester-crd"
+      },
+      "transformations": [
+        "scripts/patch-harvester",
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "rancher-monitoring-crd",
+      "name": "rancher-monitoring-crd",
+      "version": "108.0.2+up77.9.1-rancher.11",
+      "archive": "rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://charts.rancher.io/assets/rancher-monitoring-crd/rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz"
+      },
+      "transformations": [
+        "addons:patch-rancher-monitoring-crd",
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "rancher-monitoring",
+      "name": "rancher-monitoring",
+      "version": "108.0.2+up77.9.1-rancher.11",
+      "archive": "rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://charts.rancher.io/assets/rancher-monitoring/rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz"
+      },
+      "transformations": [
+        "addons:patch-rancher-monitoring",
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "rancher-logging-crd",
+      "name": "rancher-logging-crd",
+      "version": "108.0.2+up4.10.0-rancher.18",
+      "archive": "rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://charts.rancher.io/assets/rancher-logging-crd/rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "rancher-logging",
+      "name": "rancher-logging",
+      "version": "108.0.2+up4.10.0-rancher.18",
+      "archive": "rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://charts.rancher.io/assets/rancher-logging/rancher-logging-108.0.2+up4.10.0-rancher.18.tgz"
+      },
+      "transformations": [
+        "addons:patch-rancher-logging",
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "harvester-vm-import-controller",
+      "name": "harvester-vm-import-controller",
+      "version": "1.8.2",
+      "archive": "harvester-vm-import-controller-1.8.2.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/harvester/charts/releases/download/harvester-vm-import-controller-1.8.2/harvester-vm-import-controller-1.8.2.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "harvester-pcidevices-controller",
+      "name": "harvester-pcidevices-controller",
+      "version": "1.8.2",
+      "archive": "harvester-pcidevices-controller-1.8.2.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/harvester/charts/releases/download/harvester-pcidevices-controller-1.8.2/harvester-pcidevices-controller-1.8.2.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "harvester-seeder",
+      "name": "harvester-seeder",
+      "version": "1.8.2",
+      "archive": "harvester-seeder-1.8.2.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/harvester/charts/releases/download/harvester-seeder-1.8.2/harvester-seeder-1.8.2.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "nvidia-driver-runtime",
+      "name": "nvidia-driver-runtime",
+      "version": "1.8.2",
+      "archive": "nvidia-driver-runtime-1.8.2.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/harvester/charts/releases/download/nvidia-driver-runtime-1.8.2/nvidia-driver-runtime-1.8.2.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "kubeovn-operator-crd",
+      "name": "kubeovn-operator-crd",
+      "version": "1.15.4-r2",
+      "archive": "kubeovn-operator-crd-1.15.4-r2.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/harvester/charts/releases/download/kubeovn-operator-crd-1.15.4-r2/kubeovn-operator-crd-1.15.4-r2.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "kubeovn-operator",
+      "name": "kubeovn-operator",
+      "version": "1.15.4-r2",
+      "archive": "kubeovn-operator-1.15.4-r2.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/harvester/charts/releases/download/kubeovn-operator-1.15.4-r2/kubeovn-operator-1.15.4-r2.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    },
+    {
+      "id": "descheduler",
+      "name": "descheduler",
+      "version": "0.33.0",
+      "archive": "descheduler-0.33.0.tgz",
+      "source": {
+        "kind": "url",
+        "url": "https://github.com/kubernetes-sigs/descheduler/releases/download/descheduler-helm-chart-0.33.0/descheduler-0.33.0.tgz"
+      },
+      "transformations": [
+        "deterministic-archive-normalization"
+      ]
+    }
+  ]
+}

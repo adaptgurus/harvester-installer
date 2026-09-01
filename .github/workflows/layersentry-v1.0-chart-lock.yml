@@ -1,0 +1,205 @@
+name: LayerSentry v1.0 deterministic chart lock
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-chart-lock.yml
+      - provenance/layersentry-v1.0-harvester-v1.8.2.chart-sources.json
+      - scripts/provenance/collect_chart_evidence.sh
+      - scripts/provenance/build_chart_lock_candidate.py
+      - scripts/provenance/review_chart_discovery.py
+      - scripts/provenance/normalize_chart_archives.py
+      - tests/test_chart_lock_candidate.py
+      - tests/test_review_chart_discovery.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layersentry-v1.0-chart-lock
+  cancel-in-progress: false
+
+env:
+  LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+  PLAN_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.chart-sources.json
+  HELM_VERSION: v3.20.0
+  HELM_SHA256: dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286
+  YQ_VERSION: v4.52.5
+  YQ_SHA256: 75d893a0d5940d1019cb7cdc60001d9e876623852c31cfc6267047bc31149fa9
+
+jobs:
+  discover-review-and-lock:
+    name: Build charts twice, review evidence and retain incomplete lock
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout exact chart-lock source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fail fast on source, syntax, tests and structural policy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          bash -n scripts/provenance/collect_chart_evidence.sh
+          python3 -m compileall -q scripts/provenance tests
+          python3 -m unittest discover -s tests -p 'test_chart_lock_candidate.py' -v
+          python3 -m unittest discover -s tests -p 'test_review_chart_discovery.py' -v
+          python3 -m unittest discover -s tests -p 'test_normalize_chart_archives.py' -v
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$RUNNER_TEMP/chart-lock-preflight-report.json"
+
+      - name: Install checksum-locked Helm and yq
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tools="$RUNNER_TEMP/layersentry-chart-tools"
+          mkdir -p "$tools"
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors \
+            "https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz" \
+            -o "$RUNNER_TEMP/helm-linux-amd64.tar.gz"
+          echo "$HELM_SHA256  $RUNNER_TEMP/helm-linux-amd64.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/helm-linux-amd64.tar.gz" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/linux-amd64/helm" "$tools/helm"
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors \
+            "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/yq_linux_amd64" \
+            -o "$tools/yq"
+          echo "$YQ_SHA256  $tools/yq" | sha256sum -c -
+          chmod 0755 "$tools/yq"
+          "$tools/helm" version --short
+          "$tools/yq" --version
+          echo "$tools" >> "$GITHUB_PATH"
+
+      - name: Build independent deterministic chart evidence passes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pass1="$RUNNER_TEMP/chart-pass-1"
+          pass2="$RUNNER_TEMP/chart-pass-2"
+          scripts/provenance/collect_chart_evidence.sh "$pass1" "$GITHUB_SHA"
+          scripts/provenance/collect_chart_evidence.sh "$pass2" "$GITHUB_SHA"
+          echo "CHART_PASS1=$pass1" >> "$GITHUB_ENV"
+          echo "CHART_PASS2=$pass2" >> "$GITHUB_ENV"
+
+      - name: Prove byte-for-byte reproducibility
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for evidence in \
+            chart-lock-candidate.json \
+            normalization-checksums.txt \
+            normalization-report.json \
+            source-downloads.tsv; do
+            cmp "$CHART_PASS1/$evidence" "$CHART_PASS2/$evidence"
+          done
+          (
+            cd "$CHART_PASS1/final-charts"
+            sha256sum *.tgz | sort
+          ) > "$RUNNER_TEMP/chart-pass-1.sha256"
+          (
+            cd "$CHART_PASS2/final-charts"
+            sha256sum *.tgz | sort
+          ) > "$RUNNER_TEMP/chart-pass-2.sha256"
+          cmp "$RUNNER_TEMP/chart-pass-1.sha256" "$RUNNER_TEMP/chart-pass-2.sha256"
+
+      - name: Review and merge chart evidence into incomplete lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          evidence="provenance/charts/$GITHUB_SHA"
+          rm -rf "$evidence"
+          mkdir -p "$evidence"
+          cp \
+            "$CHART_PASS1/STATUS.md" \
+            "$CHART_PASS1/chart-lock-candidate.json" \
+            "$CHART_PASS1/evidence-files.sha256" \
+            "$CHART_PASS1/normalization-checksums.txt" \
+            "$CHART_PASS1/normalization-report.json" \
+            "$CHART_PASS1/source-downloads.tsv" \
+            "$evidence/"
+          python3 scripts/provenance/review_chart_discovery.py \
+            --candidate "$evidence/chart-lock-candidate.json" \
+            --plan "$PLAN_FILE" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$evidence/chart-lock-review-dry-run.json"
+          python3 scripts/provenance/review_chart_discovery.py \
+            --candidate "$evidence/chart-lock-candidate.json" \
+            --plan "$PLAN_FILE" \
+            --lock "$LOCK_FILE" \
+            --source-commit "$GITHUB_SHA" \
+            --report "$evidence/chart-lock-review.json" \
+            --apply
+          echo "CHART_EVIDENCE=$evidence" >> "$GITHUB_ENV"
+
+      - name: Revalidate lock remains fail-closed
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+          (
+            cd "$CHART_EVIDENCE"
+            sha256sum -c evidence-files.sha256
+          )
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$CHART_EVIDENCE/structural-lock-report.json"
+          python3 - "$LOCK_FILE" "$CHART_EVIDENCE/chart-lock-candidate.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          candidate = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          assert lock["lock_status"] == "incomplete"
+          assert len(candidate["charts"]) == 13
+          assert lock["charts"] == candidate["charts"]
+          unresolved = {item["id"] for item in lock["unresolved"]}
+          assert len(unresolved) == 6
+          assert "embedded-helm-chart-set" not in unresolved
+          assert "harvester-os-and-package-inputs" in unresolved
+          assert "build-toolchain" in unresolved
+          assert "harvester-offline-image-set" in unresolved
+          PY
+          sha256sum "$CHART_EVIDENCE"/*.json > "$CHART_EVIDENCE/review-files.sha256"
+
+      - name: Upload deterministic chart archives and review evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-chart-lock-${{ github.sha }}
+          path: |
+            ${{ env.CHART_PASS1 }}/final-charts/*.tgz
+            ${{ env.CHART_PASS1 }}/chart-lock-candidate.json
+            ${{ env.CHART_PASS1 }}/source-downloads.tsv
+            ${{ env.CHART_PASS1 }}/normalization-report.json
+            ${{ env.CHART_EVIDENCE }}
+            ${{ runner.temp }}/chart-lock-preflight-report.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit reviewed charts without enabling ISO build
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --quiet origin layersentry-v1.0-dev
+          test "$(git rev-parse origin/layersentry-v1.0-dev)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$LOCK_FILE" "$CHART_EVIDENCE"
+          test -n "$(git status --porcelain)"
+          git commit -m "chore(provenance): lock deterministic Harvester v1.8.2 charts [skip ci]"
+          git push origin HEAD:refs/heads/layersentry-v1.0-dev
