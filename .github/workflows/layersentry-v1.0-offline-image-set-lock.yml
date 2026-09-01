@@ -69,6 +69,7 @@ jobs:
             --lock "$LOCK_FILE" \
             --repo-root "$GITHUB_WORKSPACE" \
             --report "$RUNNER_TEMP/offline-image-set-controller-binding.json"
+
           python3 - "$LOCK_FILE" <<'PY'
           import json
           import sys
@@ -133,17 +134,226 @@ jobs:
           set -Eeuo pipefail
           candidate_dir="$GITHUB_WORKSPACE/.offline-image-set-candidate/${GITHUB_SHA}-${GITHUB_RUN_ID}"
           release_dir="$GITHUB_WORKSPACE/.finalizer-release"
-          rm -rf "$candidate_dir" "$release_dir"
+          rm -rf "$candidate_dir" "$release_dir" "$GITHUB_WORKSPACE/.finalizer-build.sh"
           mkdir -p "$candidate_dir" "$release_dir"
-          scripts/provenance/run_locked_builder.sh bash -lc '
-            set -Eeuo pipefail
-            export DOCKER_CONFIG="$GITHUB_WORKSPACE/.offline-image-set-auth"
-            docker pull --platform linux/amd64 "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4" >/dev/null
-            ./scripts/default
+
+          # scripts/default is expanded here so the unchanged, reviewed
+          # controller can be rebuilt from its original workspace path. The
+          # former temporary Git-archive path changed Go's command-line package
+          # identity and therefore changed the otherwise deterministic binary.
+          cat > "$GITHUB_WORKSPACE/.finalizer-build.sh" <<'BUILDER_SCRIPT'
+          #!/usr/bin/env bash
+          set -Eeuo pipefail
+
+          top_dir=${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}
+          lock_file="$top_dir/provenance/layersentry-v1.0-harvester-v1.8.2.lock.json"
+          mkdir -p "$top_dir/dist"
+          cd "$top_dir"
+
+          python3 scripts/provenance/verify_os_package_binding.py \
+            --plan provenance/layersentry-v1.0-harvester-os-input.json \
+            --lock "$lock_file" \
+            --repo-root "$top_dir" \
+            --report dist/os-package-binding-report.json
+          python3 scripts/provenance/verify_controller_binding.py \
+            --lock "$lock_file" \
+            --repo-root "$top_dir" \
+            --report dist/controller-binding-report.json
+
+          ./scripts/check-images
+          ./scripts/build
+          ./scripts/test
+
+          stage_dir=$(mktemp -d "${RUNNER_TEMP:-/tmp}/layersentry-controller-finalizer.XXXXXX")
+          cleanup_stage() {
+            rm -rf "$stage_dir"
+          }
+          trap cleanup_stage EXIT INT TERM
+
+          python3 - "$lock_file" > "$stage_dir/binding.txt" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          sources = [
+              item
+              for item in lock.get("source_locks", [])
+              if isinstance(item, dict)
+              and item.get("component") == "layersentry-controller"
+          ]
+          images = [
+              item
+              for item in lock.get("container_images", [])
+              if isinstance(item, dict)
+              and item.get("id") == "layersentry-controller"
+          ]
+          reviewed = lock.get("reviewed_controller_image")
+          if len(sources) != 1 or len(images) != 1 or not isinstance(reviewed, dict):
+              raise SystemExit("controller source/image/review evidence is incomplete")
+          source = sources[0]
+          image = images[0]
+          commit = str(source.get("commit", ""))
+          if not re.fullmatch(r"[0-9a-f]{40}", commit):
+              raise SystemExit("controller source commit is invalid")
+          if source.get("repository") != "https://github.com/adaptgurus/harvester-installer.git":
+              raise SystemExit("controller source repository is unexpected")
+          if source.get("version_label") != "v1.0.0":
+              raise SystemExit("controller version is unexpected")
+          ref = str(image.get("ref", ""))
+          if not re.fullmatch(
+              r"ghcr\.io/adaptgurus/layersentry-controller@sha256:[0-9a-f]{64}",
+              ref,
+          ):
+              raise SystemExit("controller image is not locked by GHCR digest")
+          version_alias = "ghcr.io/adaptgurus/layersentry-controller:v1.0.0"
+          source_alias = f"ghcr.io/adaptgurus/layersentry-controller:source-{commit}"
+          if image.get("aliases") != [version_alias, source_alias]:
+              raise SystemExit("controller aliases differ from reviewed evidence")
+          values = [
+              commit,
+              ref,
+              version_alias,
+              source_alias,
+              str(reviewed.get("build_epoch", "")),
+              str(reviewed.get("binary_sha256", "")),
+          ]
+          if not re.fullmatch(r"[1-9][0-9]*", values[4]):
+              raise SystemExit("controller build epoch is invalid")
+          if not re.fullmatch(r"[0-9a-f]{64}", values[5]):
+              raise SystemExit("controller binary hash is invalid")
+          print("\n".join(values))
+          PY
+
+          mapfile -t controller_binding < "$stage_dir/binding.txt"
+          [[ ${#controller_binding[@]} -eq 6 ]]
+          controller_commit=${controller_binding[0]}
+          controller_ref=${controller_binding[1]}
+          controller_version_alias=${controller_binding[2]}
+          controller_source_alias=${controller_binding[3]}
+          controller_epoch=${controller_binding[4]}
+          controller_binary_sha=${controller_binding[5]}
+
+          git merge-base --is-ancestor "$controller_commit" HEAD
+          git diff --quiet "$controller_commit" -- \
+            go.mod \
+            cmd/layersentry-controller/main.go \
+            cmd/layersentry-controller/main_test.go
+
+          # Match the original approved build exactly: same locked builder,
+          # same repository path, same named Go source file, same flags, and no
+          # finalizer SOURCE_DATE_EPOCH in the Go compiler environment.
+          (
+            cd "$top_dir"
+            unset SOURCE_DATE_EPOCH
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+              go build \
+                -trimpath \
+                -buildvcs=false \
+                -ldflags "-s -w -buildid= -X main.version=v1.0.0 -X main.sourceCommit=${controller_commit} -X main.buildEpoch=${controller_epoch}" \
+                -o "$stage_dir/layersentry-controller" \
+                "$top_dir/cmd/layersentry-controller/main.go"
+          )
+          echo "$controller_binary_sha  $stage_dir/layersentry-controller" \
+            | sha256sum -c -
+
+          docker pull --platform linux/amd64 "$controller_ref" >/dev/null
+          docker image inspect "$controller_ref" > "$stage_dir/controller-image.json"
+          python3 - "$stage_dir/controller-image.json" "$lock_file" "$controller_ref" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          values = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          lock = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          ref = sys.argv[3]
+          if not isinstance(values, list) or len(values) != 1:
+              raise SystemExit("controller inspect did not return exactly one image")
+          reviewed = lock.get("reviewed_controller_image")
+          if not isinstance(reviewed, dict):
+              raise SystemExit("reviewed controller metadata is missing")
+          item = values[0]
+          if item.get("Id") != "sha256:" + str(reviewed.get("image_config_digest", "")):
+              raise SystemExit("controller config digest differs from reviewed evidence")
+          manifest_digest = ref.split("@", 1)[1]
+          if not any(
+              str(value).endswith(manifest_digest)
+              for value in item.get("RepoDigests") or []
+          ):
+              raise SystemExit("controller image does not retain its locked RepoDigest")
+          if item.get("Os") != "linux" or item.get("Architecture") != "amd64":
+              raise SystemExit("controller image platform is not linux/amd64")
+          if item.get("RootFS", {}).get("Layers") != reviewed.get("rootfs_diff_ids"):
+              raise SystemExit("controller rootfs differs from reviewed evidence")
+          config = item.get("Config") or {}
+          expected = {
+              "User": reviewed.get("runtime_user"),
+              "Entrypoint": reviewed.get("entrypoint"),
+              "Cmd": reviewed.get("cmd"),
+              "Labels": reviewed.get("image_labels"),
+          }
+          for field, wanted in expected.items():
+              if config.get(field) != wanted:
+                  raise SystemExit(
+                      f"controller config field {field} differs from reviewed evidence"
+                  )
+          PY
+
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges \
+            "$controller_ref" --self-test > "$stage_dir/controller-self-test.json"
+          python3 - "$stage_dir/controller-self-test.json" \
+            "$controller_commit" "$controller_epoch" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          actual = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          expected = {
+              "status": "pass",
+              "component": "layersentry-controller",
+              "version": "v1.0.0",
+              "sourceCommit": sys.argv[2],
+              "buildEpoch": sys.argv[3],
+          }
+          if actual != expected:
+              raise SystemExit(f"controller self-test output differs: {actual!r}")
+          PY
+          docker tag "$controller_ref" "$controller_version_alias"
+          docker tag "$controller_ref" "$controller_source_alias"
+          printf '%s\n' \
+            "controller_source_rebuild=pass" \
+            "controller_locked_image_stage=pass" \
+            "controller_ref=$controller_ref" \
+            > dist/controller-finalizer-stage.txt
+
+          cleanup_stage
+          trap - EXIT INT TERM
+
+          export USE_LOCAL_IMAGES=layersentry-provenance-lock
+          ./scripts/build-bundle
+          python3 scripts/provenance/normalize_chart_archives.py \
+            package/harvester-repo/charts \
+            --report dist/chart-normalization-report.json
+          helm repo index package/harvester-repo/charts
+          ./scripts/package-harvester-repo
+          ./scripts/package-harvester-installer
+          ./scripts/package-harvester-os
+          BUILDER_SCRIPT
+          chmod 0700 "$GITHUB_WORKSPACE/.finalizer-build.sh"
+          trap 'rm -f "$GITHUB_WORKSPACE/.finalizer-build.sh"' EXIT
+
+          scripts/provenance/run_locked_builder.sh \
+            bash .finalizer-build.sh
+          scripts/provenance/run_locked_builder.sh --no-daemon \
             bash scripts/prepare-production-iso-evidence.sh \
               dist/artifacts \
-              "$GITHUB_WORKSPACE/.finalizer-release"
-          '
+              .finalizer-release
+
+          rm -f "$GITHUB_WORKSPACE/.finalizer-build.sh"
+          trap - EXIT
           echo "CANDIDATE_DIR=$candidate_dir" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=$release_dir" >> "$GITHUB_ENV"
 
@@ -293,5 +503,6 @@ jobs:
         run: |
           rm -rf \
             "$GITHUB_WORKSPACE/.offline-image-set-auth" \
-            "$GITHUB_WORKSPACE/.offline-image-set-candidate"
+            "$GITHUB_WORKSPACE/.offline-image-set-candidate" \
+            "$GITHUB_WORKSPACE/.finalizer-build.sh"
           docker logout ghcr.io >/dev/null 2>&1 || true
