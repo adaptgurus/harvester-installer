@@ -1,7 +1,7 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
-cd $(dirname $0)
+cd "$(dirname "$0")"
 
 python3 ./provenance/verify_os_package_binding.py \
   --plan ../provenance/layersentry-v1.0-harvester-os-input.json \
@@ -9,9 +9,22 @@ python3 ./provenance/verify_os_package_binding.py \
   --repo-root .. \
   --report ../dist/os-package-binding-report.json
 
+python3 ./provenance/verify_controller_binding.py \
+  --lock ../provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+  --repo-root .. \
+  --report ../dist/controller-binding-report.json
+
 ./check-images
 ./build
 ./test
+
+# Rebuild the LayerSentry controller from its exact reviewed source commit and
+# compare the binary, image config digest and rootfs diff IDs before adding the
+# stable v1.0.0 alias to the offline image archive. Bundled does not mean
+# installed or runtime-qualified.
+bash ./build-layersentry-controller --from-lock
+export USE_LOCAL_IMAGES=layersentry-provenance-lock
+
 ./build-bundle
 python3 ./provenance/normalize_chart_archives.py \
   ../package/harvester-repo/charts \
