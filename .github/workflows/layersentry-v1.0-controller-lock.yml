@@ -221,16 +221,17 @@ jobs:
               raise SystemExit("controller was incorrectly marked installed")
           PY
 
-      - name: Prove exact offline controller rebuild from merged lock
+      - name: Prove source rebuild and stage exact locked controller image
         shell: bash
         run: |
           set -Eeuo pipefail
           bash scripts/provenance/run_locked_builder.sh bash -lc '
             set -Eeuo pipefail
+            export DOCKER_CONFIG="$GITHUB_WORKSPACE/.controller-auth"
             bash scripts/build-layersentry-controller --from-lock
             docker image inspect \
               ghcr.io/adaptgurus/layersentry-controller:v1.0.0 \
-              --format "{{.Id}} {{.Config.User}}"
+              --format "{{.Id}} {{.Config.User}} {{join .RepoDigests \",\"}}"
           '
 
       - name: Upload auditable controller evidence
