@@ -1,0 +1,177 @@
+name: LayerSentry v1.8.2 production offline ISO
+
+on:
+  push:
+    branches:
+      - feat/layersentry-v1.8.2-production
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: layersentry-v1.8.2-production-offline-iso
+  cancel-in-progress: true
+
+jobs:
+  build-production-offline-iso:
+    if: contains(github.event.head_commit.message, '[build-iso]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      DRONE_TAG: v1.0
+      DRONE_BRANCH: feat/layersentry-v1.8.2-production
+      DISABLE_BUILD_NET_INSTALL_ISO: "true"
+      BUILD_QCOW: "false"
+    steps:
+      - name: Checkout validated LayerSentry production source
+        uses: actions/checkout@v4
+        with:
+          ref: feat/layersentry-v1.8.2-production
+          fetch-depth: 0
+
+      - name: Validate production source and version lock
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          # The reviewed full-offline source baseline must remain in history.
+          git merge-base --is-ancestor 49e533b1afbaaa08f0611090a4c09f2a6c6098ed HEAD
+
+          # Exact upstream source pins.
+          grep -F 'load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2' scripts/build-bundle
+          grep -F 'git clone --branch v1.8.2 --single-branch --depth 1 https://github.com/harvester/harvester.git ../harvester' scripts/build-bundle
+          grep -F 'load_and_source_addon ${addons_path} https://github.com/harvester/addons.git v1.8.2' scripts/package-harvester-os
+
+          # Exact embedded versions from Harvester v1.8.2.
+          grep -F 'RKE2_VERSION="v1.35.7+rke2r1"' scripts/version-rke2
+          grep -F 'RANCHER_VERSION="v2.14.3"' scripts/version-rancher
+
+          # LayerSentry product/base provenance and full-offline-only policy.
+          grep -F 'PRETTY_NAME="LayerSentry 1.0"' scripts/package-harvester-os
+          grep -F 'BASE_OS_RELEASE_NAME="Harvester ${HARVESTER_VERSION}"' scripts/package-harvester-os
+          grep -F 'DISABLE_BUILD_NET_INSTALL_ISO=true' scripts/package-harvester-os
+          grep -F 'if [ "${ARCH}" == "amd64" ] && [ "${DISABLE_BUILD_NET_INSTALL_ISO}" != "true" ]' scripts/package-harvester-os
+
+          # NTP must remain user-editable.
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("pkg/console/install_panels.go").read_text()
+          if 'NTPServers: "time.google.com",' not in text:
+              raise SystemExit("expected connected-install NTP starting value missing")
+          ntp = text[text.index("func addNTPServersPanel"):]
+          for marker in (
+              "widgets.NewInput(c.Gui, ntpServersPanel",
+              "ntpServersV.Value = userInputData.NTPServers",
+              "ntpServers, err := ntpServersV.GetData()",
+              "userInputData.NTPServers = ntpServers",
+          ):
+              if marker not in ntp:
+                  raise SystemExit(f"editable NTP marker missing: {marker}")
+          PY
+
+          git rev-parse HEAD
+          df -h
+          docker system df || true
+
+      - name: Build full offline ISO with native Harvester v1.8.2 pipeline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          make default
+
+      - name: Verify ISO and capture immutable provenance
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p dist/layersentry-production
+          mapfile -t full_isos < <(find dist/artifacts -maxdepth 1 -type f -name '*-amd64.iso' ! -name '*-net-install.iso' -print)
+          if [ "${#full_isos[@]}" -ne 1 ]; then
+            echo "Expected exactly one full amd64 ISO, found ${#full_isos[@]}"
+            printf '%s\n' "${full_isos[@]}"
+            find dist/artifacts -maxdepth 1 -type f -printf '%f\n' | sort
+            exit 1
+          fi
+
+          if find dist/artifacts -maxdepth 1 -type f -name '*-net-install.iso' | grep -q .; then
+            echo "LayerSentry production policy forbids the network/net-install ISO artifact"
+            exit 1
+          fi
+
+          release_iso=dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso
+          cp "${full_isos[0]}" "$release_iso"
+
+          sha512sum "$release_iso" > "${release_iso}.sha512"
+          stat -c '%s' "$release_iso" > "${release_iso}.bytes"
+          git rev-parse HEAD > dist/layersentry-production/source-commit.txt
+
+          if ! command -v xorriso >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y xorriso
+          fi
+
+          mkdir -p dist/layersentry-production/iso-metadata
+          xorriso -osirrox on \
+            -indev "$release_iso" \
+            -extract /harvester-release.yaml dist/layersentry-production/iso-metadata/harvester-release.yaml
+
+          cat dist/layersentry-production/iso-metadata/harvester-release.yaml
+          grep -F 'harvester: v1.8.2' dist/layersentry-production/iso-metadata/harvester-release.yaml
+          grep -F 'os: Harvester v1.8.2' dist/layersentry-production/iso-metadata/harvester-release.yaml
+          grep -F 'kubernetes: v1.35.7+rke2r1' dist/layersentry-production/iso-metadata/harvester-release.yaml
+          grep -F 'rancher: v2.14.3' dist/layersentry-production/iso-metadata/harvester-release.yaml
+
+          source_commit=$(cat dist/layersentry-production/source-commit.txt)
+          iso_bytes=$(cat "${release_iso}.bytes")
+          iso_sha512=$(awk '{print $1}' "${release_iso}.sha512")
+
+          cat > dist/layersentry-production/build-manifest.yaml <<EOF
+          apiVersion: release.layersentry.io/v1
+          kind: IsoBuildEvidence
+          metadata:
+            product: LayerSentry
+            productVersion: "1.0"
+          source:
+            repository: adaptgurus/harvester-installer
+            branch: feat/layersentry-v1.8.2-production
+            commit: ${source_commit}
+            harvesterRef: v1.8.2
+            harvesterCommit: 5320dfa6770f63406750e7c64b24ed87c543e6ad
+            addonsRef: v1.8.2
+            addonsCommit: f60d73d894e00f18d5e11cd21a301ed1b016631c
+          iso:
+            filename: layersentry-v1.0-harvester-v1.8.2-amd64.iso
+            bytes: ${iso_bytes}
+            sha512: ${iso_sha512}
+            classification: BUILD_GOOD_CANDIDATE
+          policy:
+            fullOfflineIso: true
+            netInstallIsoGenerated: false
+            installGood: false
+            airgapGood: false
+            releaseGood: false
+          EOF
+
+          cat dist/layersentry-production/build-manifest.yaml
+          ls -lh dist/layersentry-production
+
+          if [ -f dist/artifacts/harvester-images-list-amd64.txt ]; then
+            cp dist/artifacts/harvester-images-list-amd64.txt dist/layersentry-production/
+          fi
+
+      - name: Upload stable LayerSentry production ISO evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-v1.0-harvester-v1.8.2-amd64-offline-iso
+          path: |
+            dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso
+            dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso.sha512
+            dist/layersentry-production/layersentry-v1.0-harvester-v1.8.2-amd64.iso.bytes
+            dist/layersentry-production/source-commit.txt
+            dist/layersentry-production/build-manifest.yaml
+            dist/layersentry-production/iso-metadata/harvester-release.yaml
+            dist/layersentry-production/harvester-images-list-amd64.txt
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
