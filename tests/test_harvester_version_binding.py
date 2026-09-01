@@ -34,10 +34,16 @@ class HarvesterVersionBindingTests(unittest.TestCase):
         (origin / "package").mkdir()
         values = origin / "deploy" / "charts" / "harvester"
         values.mkdir(parents=True)
+        # Match the relevant upstream behavior: SPRINT_RELEASE is optional and
+        # read without initialization. The wrapper must remain correct even when
+        # its caller has `set -u` enabled.
         (origin / "scripts" / "version").write_text(
             """#!/bin/bash
 GIT_TAG=$(git tag -l --contains HEAD | head -n 1)
-if [[ -n \"$GIT_TAG\" ]]; then
+if [[ \"$GIT_TAG\" == *\"-dev-\"* ]]; then
+  SPRINT_RELEASE=\"-dev-\"
+fi
+if [[ -n \"$GIT_TAG\" && -z \"$SPRINT_RELEASE\" ]]; then
   VERSION=$GIT_TAG
   APP_VERSION=$GIT_TAG
   CHART_VERSION=${GIT_TAG#v}
@@ -88,7 +94,7 @@ esac
         yq.chmod(0o755)
         return tools
 
-    def test_missing_release_tag_is_fetched_and_bound_to_exact_commit(self) -> None:
+    def test_missing_release_tag_is_fetched_under_nounset_and_bound_to_exact_commit(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             origin, commit = self.create_origin(root)
@@ -106,14 +112,14 @@ esac
             proc = run(
                 "bash",
                 "-c",
-                'source "$1" "$2"; printf "%s|%s|%s|%s" "$HARVESTER_VERSION" "$HARVESTER_APP_VERSION" "$HARVESTER_CHART_VERSION" "$HARVESTER_KUBEVIRT_VERSION"',
+                'set -Eeuo pipefail; source "$1" "$2"; printf "%s|%s|%s|%s|%s" "$HARVESTER_VERSION" "$HARVESTER_APP_VERSION" "$HARVESTER_CHART_VERSION" "$HARVESTER_KUBEVIRT_VERSION" "$HARVESTER_MIN_UPGRADABLE_VERSION"',
                 "bash",
                 str(VERSION_SCRIPT),
                 str(checkout),
                 env=env,
             )
             self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertEqual(proc.stdout, "v1.8.2|v1.8.2|1.8.2|v1.7.4")
+            self.assertEqual(proc.stdout, "v1.8.2|v1.8.2|1.8.2|v1.7.4|v1.7.0")
             self.assertEqual(
                 run("git", "rev-parse", "refs/tags/v1.8.2^{commit}", cwd=checkout).stdout.strip(),
                 commit,
@@ -137,7 +143,7 @@ esac
             proc = run(
                 "bash",
                 "-c",
-                'source "$1" "$2"',
+                'set -Eeuo pipefail; source "$1" "$2"',
                 "bash",
                 str(VERSION_SCRIPT),
                 str(checkout),
