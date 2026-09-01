@@ -97,13 +97,41 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+
+          # These files contain only final, deterministic identities and must be
+          # byte-identical across independent passes.
           for evidence in \
             chart-lock-candidate.json \
             normalization-checksums.txt \
-            normalization-report.json \
             source-downloads.tsv; do
             cmp "$CHART_PASS1/$evidence" "$CHART_PASS2/$evidence"
           done
+
+          # The normalization report deliberately records sha256_before for
+          # auditability. Helm's source .tgz metadata can differ between passes,
+          # so compare the reports after removing only that pre-normalization
+          # observation. Final hashes, byte counts, paths and normalization
+          # decisions must still match exactly.
+          python3 - \
+            "$CHART_PASS1/normalization-report.json" \
+            "$CHART_PASS2/normalization-report.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          def comparable(path: str):
+              report = json.loads(Path(path).read_text(encoding="utf-8"))
+              assert report["schema"] == "layersentry.deterministic-chart-normalization/v1"
+              for chart in report["charts"]:
+                  before = chart.pop("sha256_before", None)
+                  assert isinstance(before, str) and len(before) == 64
+              return report
+
+          first = comparable(sys.argv[1])
+          second = comparable(sys.argv[2])
+          assert first == second, "normalized chart reports differ after excluding sha256_before"
+          PY
+
           (
             cd "$CHART_PASS1/final-charts"
             sha256sum *.tgz | sort
