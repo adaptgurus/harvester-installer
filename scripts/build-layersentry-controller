@@ -56,7 +56,8 @@ build_image() {
 
   # The locked builder uses Buildx's docker driver. SOURCE_DATE_EPOCH is
   # declared in the Dockerfile and passed explicitly so BuildKit normalizes
-  # config/history/layer timestamps while --load uses the supported exporter.
+  # source metadata while --load uses the supported exporter. The registry
+  # manifest itself is locked by digest after the candidate build.
   SOURCE_DATE_EPOCH="$build_epoch" \
     docker buildx build \
       --load \
@@ -434,7 +435,6 @@ values = [
     str(reviewed.get("build_epoch", "")),
     str(reviewed.get("binary_sha256", "")),
     str(reviewed.get("image_config_digest", "")),
-    ",".join(reviewed.get("rootfs_diff_ids", [])),
 ]
 if any("\n" in value or "\r" in value for value in values):
     raise SystemExit("controller binding contains a newline")
@@ -446,22 +446,21 @@ from_lock_mode() {
   [[ $# -eq 0 ]] || fail "usage: $0 --from-lock"
   [[ -f "$LOCK_FILE" ]] || fail "provenance lock is missing: $LOCK_FILE"
   local binding work source_commit controller_ref version_alias source_alias
-  local build_epoch binary_sha config_digest rootfs_csv local_tag
+  local build_epoch binary_sha locked_config_digest local_tag
   local -a values
 
   binding=$(mktemp)
   read_lock_binding > "$binding"
   mapfile -t values < "$binding"
   rm -f "$binding"
-  [[ ${#values[@]} -eq 8 ]] || fail "controller lock binding is incomplete"
+  [[ ${#values[@]} -eq 7 ]] || fail "controller lock binding is incomplete"
   source_commit=${values[0]}
   controller_ref=${values[1]}
   version_alias=${values[2]}
   source_alias=${values[3]}
   build_epoch=${values[4]}
   binary_sha=${values[5]}
-  config_digest=${values[6]}
-  rootfs_csv=${values[7]}
+  locked_config_digest=${values[6]}
 
   git -C "$TOP_DIR" merge-base --is-ancestor "$source_commit" HEAD \
     || fail "locked controller source commit is not an ancestor of the build source"
@@ -478,33 +477,84 @@ from_lock_mode() {
   echo "$binary_sha  $work/context/bin/layersentry-controller" | sha256sum -c -
   cp "$work/source/package/layersentry-controller/Dockerfile" "$work/context/Dockerfile"
 
-  local_tag="layersentry/controller-locked:${source_commit:0:12}"
+  local_tag="layersentry/controller-source-rebuild:${source_commit:0:12}"
   build_image "$work/context" "$local_tag" "$source_commit" "$build_epoch"
   validate_local_image "$local_tag" "$source_commit" "$build_epoch" \
     "$work/self-test.json"
   canonical_inspect "$local_tag" "$work/image-inspect.json"
-  python3 - "$work/image-inspect.json" "$config_digest" "$rootfs_csv" <<'PY'
+
+  # BuildKit's docker driver can stamp non-runtime image-history metadata with
+  # the daemon clock. The source rebuild therefore proves the immutable binary,
+  # rootfs content and every runtime/security-relevant config field. The ISO is
+  # then populated from the exact reviewed registry digest, never from the
+  # timestamp-variant local config object.
+  python3 - "$work/image-inspect.json" "$LOCK_FILE" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
 inspection = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-expected_config = "sha256:" + sys.argv[2]
-expected_layers = sys.argv[3].split(",") if sys.argv[3] else []
-if inspection.get("id") != expected_config:
-    raise SystemExit(
-        f"rebuilt controller config digest {inspection.get('id')!r} != {expected_config!r}"
-    )
-if inspection.get("rootfs_layers") != expected_layers:
-    raise SystemExit("rebuilt controller rootfs diff IDs differ from reviewed evidence")
+lock = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+reviewed = lock.get("reviewed_controller_image")
+if not isinstance(reviewed, dict):
+    raise SystemExit("reviewed controller metadata is missing")
+if inspection.get("os") != "linux" or inspection.get("architecture") != "amd64":
+    raise SystemExit("source-rebuilt controller platform is not linux/amd64")
+if not re.fullmatch(r"sha256:[0-9a-f]{64}", str(inspection.get("id", ""))):
+    raise SystemExit("source-rebuilt controller config ID is invalid")
+if inspection.get("rootfs_layers") != reviewed.get("rootfs_diff_ids"):
+    raise SystemExit("source-rebuilt controller rootfs differs from reviewed evidence")
+config = inspection.get("config")
+if not isinstance(config, dict):
+    raise SystemExit("source-rebuilt controller config is missing")
+comparisons = {
+    "user": reviewed.get("runtime_user"),
+    "entrypoint": reviewed.get("entrypoint"),
+    "cmd": reviewed.get("cmd"),
+    "labels": reviewed.get("image_labels"),
+    "working_dir": "",
+}
+for field, expected in comparisons.items():
+    if config.get(field) != expected:
+        raise SystemExit(
+            f"source-rebuilt controller config field {field!r} is "
+            f"{config.get(field)!r}; expected {expected!r}"
+        )
 PY
-  docker tag "$local_tag" "$version_alias"
-  docker tag "$local_tag" "$source_alias"
+
+  # The stable aliases consumed by build-bundle must resolve to the exact
+  # reviewed manifest. Pull by digest, verify both RepoDigest and config ID,
+  # then overwrite the source-rebuild aliases with that immutable image.
+  docker pull --platform linux/amd64 "$controller_ref" >/dev/null
+  python3 - "$controller_ref" "$locked_config_digest" <<'PY'
+import json
+import subprocess
+import sys
+
+ref, expected_config = sys.argv[1:]
+values = json.loads(
+    subprocess.check_output(["docker", "image", "inspect", ref], text=True)
+)
+if len(values) != 1:
+    raise SystemExit("locked controller inspect did not return exactly one image")
+item = values[0]
+if item.get("Id") != "sha256:" + expected_config:
+    raise SystemExit("pulled controller config digest differs from reviewed evidence")
+manifest_digest = ref.split("@", 1)[1]
+if not any(str(value).endswith(manifest_digest) for value in item.get("RepoDigests") or []):
+    raise SystemExit("pulled controller does not retain the reviewed manifest digest")
+if item.get("Os") != "linux" or item.get("Architecture") != "amd64":
+    raise SystemExit("pulled controller platform is not linux/amd64")
+PY
+  docker tag "$controller_ref" "$version_alias"
+  docker tag "$controller_ref" "$source_alias"
+
   rm -rf "$work"
   trap - RETURN
-  echo "LAYERSENTRY CONTROLLER LOCKED REBUILD: PASS"
+  echo "LAYERSENTRY CONTROLLER LOCKED SOURCE REBUILD: PASS"
   echo "locked_ref=$controller_ref"
-  echo "local_runtime_alias=$version_alias"
+  echo "bundle_runtime_alias=$version_alias"
 }
 
 case ${1:-} in
