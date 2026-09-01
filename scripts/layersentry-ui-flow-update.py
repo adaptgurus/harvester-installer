@@ -15,6 +15,18 @@ def replace_idempotent(old: str, new: str, label: str) -> None:
     text = text.replace(old, new, 1)
 
 
+def replace_one_of(candidates: tuple[str, ...], new: str, label: str) -> None:
+    global text
+    if new in text:
+        return
+    matches = [candidate for candidate in candidates if candidate in text]
+    if len(matches) != 1:
+        raise SystemExit(
+            f"{label}: expected exactly one supported source marker, found {len(matches)}"
+        )
+    text = text.replace(matches[0], new, 1)
+
+
 def replace_in_function(start_marker: str, end_marker: str, old: str, new: str, label: str) -> None:
     global text
     start = text.index(start_marker)
@@ -29,12 +41,16 @@ def replace_in_function(start_marker: str, end_marker: str, old: str, new: str, 
     text = text[:start] + block + text[end:]
 
 
-# LayerSentry interactive installer defaults to a vendor-neutral, globally
-# reachable NTP endpoint instead of the SUSE pool used by upstream Harvester.
-replace_idempotent(
-    'NTPServers: "0.suse.pool.ntp.org",',
-    'NTPServers: "time.google.com",',
-    "NTP default",
+# V10.2.2 true-air-gap policy: LayerSentry must not inject a public Internet
+# NTP server as the platform default. The existing NTP page remains visible so
+# operators can enter customer-approved NTP servers during installation.
+replace_one_of(
+    (
+        'NTPServers: "time.google.com",',
+        'NTPServers: "0.suse.pool.ntp.org",',
+    ),
+    'NTPServers: "",',
+    "air-gap-safe NTP default",
 )
 
 # Keep proxy configuration in the interactive flow, but hide the optional SSH
@@ -87,8 +103,14 @@ PATH.write_text(text)
 
 # Strong postconditions scoped to the visible interactive flow.
 final = PATH.read_text()
-if 'NTPServers: "time.google.com",' not in final:
-    raise SystemExit("LayerSentry NTP default was not applied")
+if 'NTPServers: "",' not in final:
+    raise SystemExit("LayerSentry air-gap-safe empty NTP default was not applied")
+for forbidden_default in (
+    'NTPServers: "time.google.com",',
+    'NTPServers: "0.suse.pool.ntp.org",',
+):
+    if forbidden_default in final:
+        raise SystemExit(f"public NTP default remains: {forbidden_default}")
 if 'VIP (Virtual IP) provides one stable management endpoint for the LayerSentry cluster.' not in final:
     raise SystemExit("LayerSentry VIP explanation was not applied")
 
