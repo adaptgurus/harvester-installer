@@ -54,6 +54,22 @@ jobs:
             scripts/provenance/verify_image_coverage.py \
             scripts/provenance/verify_lock.py
 
+      - name: Archive remaining pre-provenance qualification workflows
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          archive=.github/workflows-disabled/pre-provenance-v1.8.2
+          mkdir -p "$archive"
+          for workflow in \
+            layersentry-hyperv-harness-validation.yml \
+            layersentry-production-boot-smoke.yml; do
+            source_path=".github/workflows/$workflow"
+            archive_path="$archive/$workflow"
+            test -f "$source_path"
+            test ! -e "$archive_path"
+            mv "$source_path" "$archive_path"
+          done
+
       - name: Remove one-time transport files
         shell: bash
         run: |
@@ -81,7 +97,9 @@ jobs:
           for workflow in \
             layersentry-production-bootstrap.yml \
             layersentry-production-iso.yml \
-            layersentry-build-evidence.yml; do
+            layersentry-build-evidence.yml \
+            layersentry-hyperv-harness-validation.yml \
+            layersentry-production-boot-smoke.yml; do
             test ! -e ".github/workflows/$workflow"
             test -f ".github/workflows-disabled/pre-provenance-v1.8.2/$workflow"
           done
