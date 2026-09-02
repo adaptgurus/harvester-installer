@@ -38,7 +38,7 @@ source ${SCRIPTS_DIR}/version-harvester ${TOP_DIR}/../harvester
 source ${SCRIPTS_DIR}/lib/iso
 
 # The reviewed tag is retained only as provenance metadata. The build consumes
-# the immutable linux/amd64 OCI digest and must find it in the offline cache.
+# the immutable linux/amd64 OCI digest and never substitutes a mutable tag.
 BASE_OS_IMAGE="docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4"
 HARVESTER_OS_IMAGE=rancher/harvester-os:$VERSION
 
@@ -70,8 +70,14 @@ ${SCRIPTS_DIR}/collect-deps.sh harvester-release.yaml
 echo "The harvester-release info is"
 cat ./harvester-release.yaml
 
-# A full-offline build may not contact a registry here. The immutable base image
-# must already be staged by the locked image-set preparation step.
+# The finalizer's locked builder uses an isolated Docker daemon. Stage only the
+# reviewed immutable base OS digest when that exact manifest is not present in
+# the daemon yet. There is deliberately no mutable-tag or latest fallback.
+if ! docker image inspect "${BASE_OS_IMAGE}" >/dev/null 2>&1; then
+  echo "Staging reviewed immutable Harvester base OS image ${BASE_OS_IMAGE}"
+  docker pull --platform linux/amd64 "${BASE_OS_IMAGE}" >/dev/null
+fi
+# Fail closed unless the exact digest can now be addressed locally.
 docker image inspect "${BASE_OS_IMAGE}" >/dev/null
 docker build --pull=false \
 	--build-arg BASE_OS_IMAGE="${BASE_OS_IMAGE}" \
