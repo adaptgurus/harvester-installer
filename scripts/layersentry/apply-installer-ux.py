@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""Apply the LayerSentry installer progress UX to the upstream-compatible Go sources.
+"""Wire the LayerSentry milestone UX into the pinned Harvester v1.8.2 installer.
 
-The transform is deterministic, idempotent, and committed as a build input so the ISO
-remains source/provenance-bound without renaming upstream internal contracts.
-
-Customer-facing behavior:
-- native harv-install stdout/stderr is preserved in logrus/install logs;
-- package names and other raw harv-install lines are not copied into the main panel;
-- progress advances only on real installer lifecycle/output events (never timers);
-- non-harv-install command output keeps the upstream panel behavior.
+The actual progress renderer/output observer lives in
+pkg/console/layersentry_install_progress.go.  This transform only wires that
+reviewable implementation into the upstream-compatible installer lifecycle.
+It is deterministic and idempotent and does not rename upstream APIs/contracts.
 """
 
 from pathlib import Path
@@ -16,17 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 UTIL = ROOT / "pkg/console/util.go"
 PANELS = ROOT / "pkg/console/install_panels.go"
-
-
-def replace_once(text: str, old: str, new: str, label: str) -> str:
-    if new in text:
-        return text
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(
-            f"LayerSentry installer UX transform: expected one {label} anchor, found {count}"
-        )
-    return text.replace(old, new, 1)
+PROGRESS = ROOT / "pkg/console/layersentry_install_progress.go"
 
 
 def replace_once_in_region(
@@ -37,11 +23,12 @@ def replace_once_in_region(
     new: str,
     label: str,
 ) -> str:
-    """Replace exactly once inside a named source region, ignoring similar code elsewhere."""
-    if text.count(start_anchor) != 1:
+    """Replace exactly once inside a named source region."""
+    start_count = text.count(start_anchor)
+    if start_count != 1:
         raise SystemExit(
             f"LayerSentry installer UX transform: expected one {label} region start, "
-            f"found {text.count(start_anchor)}"
+            f"found {start_count}"
         )
     start = text.index(start_anchor)
     end = text.find(end_anchor, start + len(start_anchor))
@@ -62,24 +49,17 @@ def replace_once_in_region(
     return text[:start] + region + text[end:]
 
 
-def insert_before_once(text: str, anchor: str, block: str, marker: str, label: str) -> str:
-    if marker in text:
-        return text
-    count = text.count(anchor)
-    if count != 1:
-        raise SystemExit(
-            f"LayerSentry installer UX transform: expected one {label} anchor, found {count}"
-        )
-    return text.replace(anchor, block + anchor, 1)
-
-
 def patch_util() -> None:
     text = UTIL.read_text(encoding="utf-8")
 
     execute_start = "func execute(ctx context.Context, g *gocui.Gui, env []string, cmdName string) error {\n"
     execute_end = "func dropCR(data []byte) []byte {\n"
-    old_capture = '''\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stderr]", stderr, &writeLock)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stdout]", stdout, &writeLock)\n\t}()\n'''
-    new_capture = '''\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, installPanel, "[stderr]", stderr, &writeLock)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, installPanel, "[stdout]", stdout, &writeLock)\n\t}()\n'''
+
+    # The dedicated LayerSentry capture function writes every native line to
+    # logrus and intentionally does not append those lines to the customer-facing
+    # install panel.  It observes real harv-install output for milestone changes.
+    old_capture = '''\tvar wg sync.WaitGroup\n\tvar writeLock sync.Mutex\n\n\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stderr]", stderr, &writeLock)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stdout]", stdout, &writeLock)\n\t}()\n'''
+    new_capture = '''\tvar wg sync.WaitGroup\n\n\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, "[stderr]", stderr)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, "[stdout]", stdout)\n\t}()\n'''
     text = replace_once_in_region(
         text,
         execute_start,
@@ -87,149 +67,6 @@ def patch_util() -> None:
         old_capture,
         new_capture,
         "execute output capture",
-    )
-
-    helper_anchor = "func saveElementalConfig(obj interface{}) (string, string, error) {\n"
-    helper_marker = "func captureLayerSentryInstallOutput("
-    helper_block = r'''// LayerSentry installer progress UX. These values are driven by real installer
-// lifecycle/output events. There is intentionally no timer-based progress.
-const layersentryNativeInstaller = "/usr/sbin/harv-install"
-
-var layersentryInstallProgress = struct {
-	sync.Mutex
-	percent int
-	stage   string
-}{}
-
-func resetLayerSentryInstallProgress() {
-	layersentryInstallProgress.Lock()
-	layersentryInstallProgress.percent = 0
-	layersentryInstallProgress.stage = ""
-	layersentryInstallProgress.Unlock()
-}
-
-func renderLayerSentryInstallProgress(stage string, percent int) string {
-	if percent < 0 {
-		percent = 0
-	}
-	if percent > 100 {
-		percent = 100
-	}
-	const width = 32
-	filled := percent * width / 100
-	return fmt.Sprintf(
-		"                 LAYERSENTRY\n"+
-			"                    v1.0\n\n"+
-			"             Installing LayerSentry\n\n"+
-			"Stage: %s\n\n"+
-			"[%s%s] %d%%\n\n"+
-			"Please wait. Do not power off the system.\n",
-		stage,
-		strings.Repeat("#", filled),
-		strings.Repeat("-", width-filled),
-		percent,
-	)
-}
-
-func setLayerSentryInstallProgress(g *gocui.Gui, stage string, percent int) {
-	layersentryInstallProgress.Lock()
-	if percent < layersentryInstallProgress.percent ||
-		(percent == layersentryInstallProgress.percent && stage == layersentryInstallProgress.stage) {
-		layersentryInstallProgress.Unlock()
-		return
-	}
-	layersentryInstallProgress.percent = percent
-	layersentryInstallProgress.stage = stage
-	layersentryInstallProgress.Unlock()
-
-	content := renderLayerSentryInstallProgress(stage, percent)
-	done := make(chan struct{})
-	g.Update(func(g *gocui.Gui) error {
-		defer close(done)
-		v, err := g.View(installPanel)
-		if err != nil {
-			return err
-		}
-		v.Clear()
-		_, err = fmt.Fprint(v, content)
-		return err
-	})
-	<-done
-}
-
-func validateLayerSentryInstallMedia() error {
-	required := []string{
-		layersentryNativeInstaller,
-		"/etc/harvester-release.yaml",
-		"/usr/local/sbin/layersentry-branding.sh",
-		"/etc/systemd/system/layersentry-branding.service",
-	}
-	for _, path := range required {
-		info, err := os.Stat(path)
-		if err != nil {
-			return fmt.Errorf("LayerSentry installation media validation failed for %s: %w", path, err)
-		}
-		if info.IsDir() {
-			return fmt.Errorf("LayerSentry installation media validation failed: %s is not a file", path)
-		}
-	}
-	return nil
-}
-
-func updateLayerSentryInstallProgressFromOutput(g *gocui.Gui, line string) {
-	// The arrival of native installer output is itself a real milestone: the
-	// installation engine is actively processing the offline payload.
-	setLayerSentryInstallProgress(g, "Installing LayerSentry packages", 48)
-
-	lower := strings.ToLower(line)
-	switch {
-	case strings.Contains(lower, "kubernetes"),
-		strings.Contains(lower, "rke2"),
-		strings.Contains(lower, "rancher"),
-		strings.Contains(lower, "helm"),
-		strings.Contains(lower, "chart"):
-		setLayerSentryInstallProgress(g, "Configuring Kubernetes and platform services", 66)
-	case strings.Contains(lower, "longhorn"),
-		strings.Contains(lower, "storage"),
-		strings.Contains(lower, "network"),
-		strings.Contains(lower, "kube-vip"),
-		strings.Contains(lower, "multus"),
-		strings.Contains(lower, "cni"):
-		setLayerSentryInstallProgress(g, "Configuring networking and storage", 78)
-	}
-}
-
-func captureLayerSentryInstallOutput(g *gocui.Gui, cmdName, panel, logPrefix string, reader io.Reader, lock *sync.Mutex) {
-	scanner := bufio.NewScanner(reader)
-	scanner.Split(ScanLines)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Preserve every native line in the normal installation logs for
-		// troubleshooting, including package-manager output.
-		logrus.Infof("%s: %s", logPrefix, line)
-		if cmdName == layersentryNativeInstaller {
-			updateLayerSentryInstallProgressFromOutput(g, line)
-			continue
-		}
-
-		// Preserve upstream visible output behavior for other commands.
-		lock.Lock()
-		printToPanel(g, line, panel)
-		lock.Unlock()
-	}
-	if err := scanner.Err(); err != nil {
-		logrus.Warnf("%s output scanner failed: %v", logPrefix, err)
-	}
-}
-
-'''
-    text = insert_before_once(
-        text,
-        helper_anchor,
-        helper_block,
-        helper_marker,
-        "LayerSentry progress helper insertion",
     )
 
     do_install_start = "func doInstall(g *gocui.Gui, hvstConfig *config.HarvesterConfig, webhooks RendererWebhooks) error {\n"
@@ -248,7 +85,7 @@ func captureLayerSentryInstallOutput(g *gocui.Gui, cmdName, panel, logPrefix str
     )
 
     old_install = '''\tif err := execute(ctx, g, env, "/usr/sbin/harv-install"); err != nil {\n'''
-    new_install = '''\tsetLayerSentryInstallProgress(g, "Installing base operating system", 32)\n\tif err := execute(ctx, g, env, layersentryNativeInstaller); err != nil {\n'''
+    new_install = '''\tsetLayerSentryInstallProgress(g, "Installing base operating system", 32)\n\tif err := execute(ctx, g, env, "/usr/sbin/harv-install"); err != nil {\n'''
     text = replace_once_in_region(
         text, do_install_start, do_install_end, old_install, new_install, "native installer execution"
     )
@@ -297,24 +134,41 @@ def patch_panels() -> None:
 def validate_result() -> None:
     util = UTIL.read_text(encoding="utf-8")
     panels = PANELS.read_text(encoding="utf-8")
+    progress = PROGRESS.read_text(encoding="utf-8")
+
+    # The implementation must exist once, in the dedicated source file.
+    progress_markers = (
+        "func resetLayerSentryInstallProgress()",
+        "func renderLayerSentryInstallProgress(stage string, percent int) string",
+        "func setLayerSentryInstallProgress(g *gocui.Gui, stage string, percent int)",
+        "func validateLayerSentryInstallMedia() error",
+        "func captureLayerSentryInstallOutput(g *gocui.Gui, commandName, logPrefix string, reader io.Reader)",
+        "func observeLayerSentryInstallMilestone(g *gocui.Gui, line string)",
+        'logrus.Infof("%s: %s", logPrefix, line)',
+        '"Installing LayerSentry packages"',
+        '"Configuring Kubernetes and platform services"',
+        '"Configuring networking and storage"',
+    )
+    for marker in progress_markers:
+        if marker not in progress:
+            raise SystemExit(f"LayerSentry progress implementation missing marker: {marker}")
+
+    if "func captureLayerSentryInstallOutput(" in util:
+        raise SystemExit("LayerSentry progress helpers must not be duplicated in util.go")
 
     required_util = (
-        "func captureLayerSentryInstallOutput(",
-        "cmdName == layersentryNativeInstaller",
+        'captureLayerSentryInstallOutput(g, cmdName, "[stderr]", stderr)',
+        'captureLayerSentryInstallOutput(g, cmdName, "[stdout]", stdout)',
         'setLayerSentryInstallProgress(g, "Validating installation media", 5)',
         'setLayerSentryInstallProgress(g, "Preparing system disks", 18)',
         'setLayerSentryInstallProgress(g, "Installing base operating system", 32)',
-        'setLayerSentryInstallProgress(g, "Installing LayerSentry packages", 48)',
-        'setLayerSentryInstallProgress(g, "Configuring Kubernetes and platform services", 66)',
-        'setLayerSentryInstallProgress(g, "Configuring networking and storage", 78)',
         'setLayerSentryInstallProgress(g, "Applying LayerSentry branding and defaults", 88)',
         'setLayerSentryInstallProgress(g, "Finalizing installation", 96)',
         'setLayerSentryInstallProgress(g, "LayerSentry installation completed", 100)',
-        'logrus.Infof("%s: %s", logPrefix, line)',
     )
     for marker in required_util:
         if marker not in util:
-            raise SystemExit(f"LayerSentry installer UX transform missing marker: {marker}")
+            raise SystemExit(f"LayerSentry installer lifecycle missing marker: {marker}")
 
     if 'installV.SetContent(renderLayerSentryInstallProgress("Validating installation media", 0))' not in panels:
         raise SystemExit("LayerSentry installer UX transform did not seed the install panel")
@@ -326,13 +180,15 @@ def validate_result() -> None:
     )
     execute_end = util.index("func dropCR(data []byte) []byte {\n", execute_start)
     execute_region = util[execute_start:execute_end]
-    if 'printToPanelAndLog(g, installPanel, "[stderr]", stderr, &writeLock)' in execute_region:
-        raise SystemExit("raw native stderr is still copied directly to the main installation panel")
-    if 'printToPanelAndLog(g, installPanel, "[stdout]", stdout, &writeLock)' in execute_region:
-        raise SystemExit("raw native stdout is still copied directly to the main installation panel")
+    if "printToPanelAndLog(g, installPanel" in execute_region:
+        raise SystemExit("raw command output is still copied directly to the main installation panel")
+    if "var writeLock sync.Mutex" in execute_region:
+        raise SystemExit("obsolete execute output lock remains after LayerSentry capture wiring")
 
 
 if __name__ == "__main__":
+    if not PROGRESS.is_file():
+        raise SystemExit("LayerSentry progress implementation file is missing")
     patch_util()
     patch_panels()
     validate_result()
