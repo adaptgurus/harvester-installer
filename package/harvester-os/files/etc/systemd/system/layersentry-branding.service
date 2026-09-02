@@ -6,7 +6,7 @@ ConditionPathExists=/etc/rancher/rke2/rke2.yaml
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/layersentry-branding.sh
+ExecStart=/bin/bash /usr/local/sbin/layersentry-branding.sh
 Restart=on-failure
 RestartSec=15
 StartLimitIntervalSec=0
