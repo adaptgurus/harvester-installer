@@ -29,6 +29,39 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
+def replace_once_in_region(
+    text: str,
+    start_anchor: str,
+    end_anchor: str,
+    old: str,
+    new: str,
+    label: str,
+) -> str:
+    """Replace exactly once inside a named source region, ignoring similar code elsewhere."""
+    if text.count(start_anchor) != 1:
+        raise SystemExit(
+            f"LayerSentry installer UX transform: expected one {label} region start, "
+            f"found {text.count(start_anchor)}"
+        )
+    start = text.index(start_anchor)
+    end = text.find(end_anchor, start + len(start_anchor))
+    if end < 0:
+        raise SystemExit(
+            f"LayerSentry installer UX transform: missing {label} region end"
+        )
+    region = text[start:end]
+    if new in region:
+        return text
+    count = region.count(old)
+    if count != 1:
+        raise SystemExit(
+            f"LayerSentry installer UX transform: expected one {label} anchor in region, "
+            f"found {count}"
+        )
+    region = region.replace(old, new, 1)
+    return text[:start] + region + text[end:]
+
+
 def insert_before_once(text: str, anchor: str, block: str, marker: str, label: str) -> str:
     if marker in text:
         return text
@@ -43,9 +76,18 @@ def insert_before_once(text: str, anchor: str, block: str, marker: str, label: s
 def patch_util() -> None:
     text = UTIL.read_text(encoding="utf-8")
 
+    execute_start = "func execute(ctx context.Context, g *gocui.Gui, env []string, cmdName string) error {\n"
+    execute_end = "func dropCR(data []byte) []byte {\n"
     old_capture = '''\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stderr]", stderr, &writeLock)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stdout]", stdout, &writeLock)\n\t}()\n'''
     new_capture = '''\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, installPanel, "[stderr]", stderr, &writeLock)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, installPanel, "[stdout]", stdout, &writeLock)\n\t}()\n'''
-    text = replace_once(text, old_capture, new_capture, "execute output capture")
+    text = replace_once_in_region(
+        text,
+        execute_start,
+        execute_end,
+        old_capture,
+        new_capture,
+        "execute output capture",
+    )
 
     helper_anchor = "func saveElementalConfig(obj interface{}) (string, string, error) {\n"
     helper_marker = "func captureLayerSentryInstallOutput("
@@ -190,43 +232,64 @@ func captureLayerSentryInstallOutput(g *gocui.Gui, cmdName, panel, logPrefix str
         "LayerSentry progress helper insertion",
     )
 
+    do_install_start = "func doInstall(g *gocui.Gui, hvstConfig *config.HarvesterConfig, webhooks RendererWebhooks) error {\n"
+    do_install_end = "func doUpgrade(g *gocui.Gui) error {\n"
+
     old_start = '''func doInstall(g *gocui.Gui, hvstConfig *config.HarvesterConfig, webhooks RendererWebhooks) error {\n\tctx := context.TODO()\n\twebhooks.Handle(EventInstallStarted)\n\n\terr := updateSystemSettings(hvstConfig)\n'''
     new_start = '''func doInstall(g *gocui.Gui, hvstConfig *config.HarvesterConfig, webhooks RendererWebhooks) error {\n\tctx := context.TODO()\n\twebhooks.Handle(EventInstallStarted)\n\tresetLayerSentryInstallProgress()\n\tsetLayerSentryInstallProgress(g, "Validating installation media", 5)\n\tif err := validateLayerSentryInstallMedia(); err != nil {\n\t\twebhooks.Handle(EventInstallFailed)\n\t\treturn err\n\t}\n\n\terr := updateSystemSettings(hvstConfig)\n'''
-    text = replace_once(text, old_start, new_start, "install-start lifecycle")
+    text = replace_once_in_region(
+        text, do_install_start, do_install_end, old_start, new_start, "install-start lifecycle"
+    )
 
     old_disks = '''\tif hvstConfig.ShouldCreateDataPartitionOnOsDisk() {\n'''
     new_disks = '''\tsetLayerSentryInstallProgress(g, "Preparing system disks", 18)\n\tif hvstConfig.ShouldCreateDataPartitionOnOsDisk() {\n'''
-    text = replace_once(text, old_disks, new_disks, "disk-preparation lifecycle")
+    text = replace_once_in_region(
+        text, do_install_start, do_install_end, old_disks, new_disks, "disk-preparation lifecycle"
+    )
 
     old_install = '''\tif err := execute(ctx, g, env, "/usr/sbin/harv-install"); err != nil {\n'''
     new_install = '''\tsetLayerSentryInstallProgress(g, "Installing base operating system", 32)\n\tif err := execute(ctx, g, env, layersentryNativeInstaller); err != nil {\n'''
-    text = replace_once(text, old_install, new_install, "native installer execution")
+    text = replace_once_in_region(
+        text, do_install_start, do_install_end, old_install, new_install, "native installer execution"
+    )
 
     old_success = '''\t}\n\twebhooks.Handle(EventInstallSuceeded)\n\n\t// Enable CTRL-C to stop system from rebooting after installation\n'''
     new_success = '''\t}\n\tsetLayerSentryInstallProgress(g, "Applying LayerSentry branding and defaults", 88)\n\twebhooks.Handle(EventInstallSuceeded)\n\n\t// Enable CTRL-C to stop system from rebooting after installation\n'''
-    text = replace_once(text, old_success, new_success, "native-install success lifecycle")
+    text = replace_once_in_region(
+        text, do_install_start, do_install_end, old_success, new_success, "native-install success lifecycle"
+    )
 
     old_shutdown = '''\tif err := execute(cancellableCtx, g, env, "/usr/sbin/cos-installer-shutdown"); err != nil {\n'''
     new_shutdown = '''\tsetLayerSentryInstallProgress(g, "Finalizing installation", 96)\n\tif err := execute(cancellableCtx, g, env, "/usr/sbin/cos-installer-shutdown"); err != nil {\n'''
-    text = replace_once(text, old_shutdown, new_shutdown, "finalization lifecycle")
+    text = replace_once_in_region(
+        text, do_install_start, do_install_end, old_shutdown, new_shutdown, "finalization lifecycle"
+    )
 
     old_complete = '''\tif err := execute(cancellableCtx, g, env, "/usr/sbin/cos-installer-shutdown"); err != nil {\n\t\twebhooks.Handle(EventInstallFailed)\n\t\treturn err\n\t}\n\n\treturn nil\n}\n'''
     new_complete = '''\tif err := execute(cancellableCtx, g, env, "/usr/sbin/cos-installer-shutdown"); err != nil {\n\t\twebhooks.Handle(EventInstallFailed)\n\t\treturn err\n\t}\n\tsetLayerSentryInstallProgress(g, "LayerSentry installation completed", 100)\n\n\treturn nil\n}\n'''
-    text = replace_once(text, old_complete, new_complete, "installation completion lifecycle")
+    text = replace_once_in_region(
+        text, do_install_start, do_install_end, old_complete, new_complete, "installation completion lifecycle"
+    )
 
     UTIL.write_text(text, encoding="utf-8")
 
 
 def patch_panels() -> None:
     text = PANELS.read_text(encoding="utf-8")
+    panel_start = "func addInstallPanel(c *Console) error {\n"
+    panel_end = "func addSpinnerPanel(c *Console) error {\n"
 
     old_panel_start = '''\tinstallV := widgets.NewPanel(c.Gui, installPanel)\n\tinstallV.PreShow = func() error {\n'''
     new_panel_start = '''\tinstallV := widgets.NewPanel(c.Gui, installPanel)\n\tinstallV.SetContent(renderLayerSentryInstallProgress("Validating installation media", 0))\n\tinstallV.PreShow = func() error {\n'''
-    text = replace_once(text, old_panel_start, new_panel_start, "install-panel initial content")
+    text = replace_once_in_region(
+        text, panel_start, panel_end, old_panel_start, new_panel_start, "install-panel initial content"
+    )
 
     old_scroll = '''\tinstallV.Wrap = true\n\tinstallV.Autoscroll = true\n'''
     new_scroll = '''\tinstallV.Wrap = true\n\tinstallV.Autoscroll = false\n'''
-    text = replace_once(text, old_scroll, new_scroll, "install-panel scrolling")
+    text = replace_once_in_region(
+        text, panel_start, panel_end, old_scroll, new_scroll, "install-panel scrolling"
+    )
 
     PANELS.write_text(text, encoding="utf-8")
 
@@ -257,9 +320,15 @@ def validate_result() -> None:
         raise SystemExit("LayerSentry installer UX transform did not seed the install panel")
     if "installV.Autoscroll = false" not in panels:
         raise SystemExit("LayerSentry installer UX transform did not disable raw-output scrolling")
-    if 'printToPanelAndLog(g, installPanel, "[stderr]", stderr, &writeLock)' in util:
+
+    execute_start = util.index(
+        "func execute(ctx context.Context, g *gocui.Gui, env []string, cmdName string) error {\n"
+    )
+    execute_end = util.index("func dropCR(data []byte) []byte {\n", execute_start)
+    execute_region = util[execute_start:execute_end]
+    if 'printToPanelAndLog(g, installPanel, "[stderr]", stderr, &writeLock)' in execute_region:
         raise SystemExit("raw native stderr is still copied directly to the main installation panel")
-    if 'printToPanelAndLog(g, installPanel, "[stdout]", stdout, &writeLock)' in util:
+    if 'printToPanelAndLog(g, installPanel, "[stdout]", stdout, &writeLock)' in execute_region:
         raise SystemExit("raw native stdout is still copied directly to the main installation panel")
 
 
