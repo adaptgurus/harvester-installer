@@ -18,4 +18,8 @@ EXPOSE 80
 
 STOPSIGNAL SIGQUIT
 
+# This source-only marker intentionally retriggers the reviewed final
+# generated-image and full-offline ISO provenance workflow.
+LABEL io.layersentry.provenance-rerun="2026-09-02"
+
 CMD ["nginx", "-g", "daemon off;"]
