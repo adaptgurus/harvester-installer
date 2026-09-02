@@ -14,6 +14,11 @@ ADDONS_COMMIT="f60d73d894e00f18d5e11cd21a301ed1b016631c"
 
 cd ${TOP_DIR}
 
+# Every build entry point, including the fail-closed offline image-set finalizer,
+# must compile the same customer-facing LayerSentry milestone UX. The transform
+# is deterministic and idempotent.
+python3 ${SCRIPTS_DIR}/layersentry/apply-installer-ux.py
+
 # Pull Harvester source and determine Harvester version.
 harvester_path=../harvester
 if [ ! -d ${harvester_path} ];then
