@@ -1,0 +1,6 @@
+name: "LayerSentry branding bootstrap"
+stages:
+  initramfs:
+    - name: "enable LayerSentry branding service"
+      systemctl:
+        enable: [layersentry-branding.service]
