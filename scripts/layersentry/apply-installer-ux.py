@@ -24,6 +24,10 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 def patch_util() -> None:
     text = UTIL.read_text(encoding="utf-8")
 
+    old_command_setup = '''\tcommand := []string{cmdName}\n\tcommand = append(command, args...)\n\tcmd := exec.CommandContext(ctx, command[0], command[1:]...)\n\tcmd.Env = append(cmd.Env, env...)\n\n\tvar writeLock sync.Mutex\n\tvar wg sync.WaitGroup\n'''
+    new_command_setup = '''\tcommand := []string{cmdName}\n\tcommand = append(command, args...)\n\tcmd := exec.CommandContext(ctx, command[0], command[1:]...)\n\tcmd.Env = append(cmd.Env, env...)\n\n\tvar wg sync.WaitGroup\n'''
+    text = replace_once(text, old_command_setup, new_command_setup, "execute output lock")
+
     old_capture = '''\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stderr]", stderr, &writeLock)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tprintToPanelAndLog(g, installPanel, "[stdout]", stdout, &writeLock)\n\t}()\n'''
     new_capture = '''\twg.Add(2)\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, "[stderr]", stderr)\n\t}()\n\n\tgo func() {\n\t\tdefer wg.Done()\n\t\tcaptureLayerSentryInstallOutput(g, cmdName, "[stdout]", stdout)\n\t}()\n'''
     text = replace_once(text, old_capture, new_capture, "execute output capture")
