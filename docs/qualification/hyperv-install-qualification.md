@@ -1,17 +1,24 @@
 # LayerSentry Hyper-V installation qualification
 
-This harness prepares clean Hyper-V virtual machines for installation testing of the exact retained `BUILD_GOOD` LayerSentry ISO. It does not rebuild, download, rename, or replace the candidate.
+This harness prepares clean Hyper-V virtual machines for installation testing of the exact retained **BUILD-GOOD candidate** LayerSentry ISO. It does not rebuild, download, rename, or replace the candidate. This Hyper-V environment is a POC/reference qualification environment and does not by itself constitute physical-production certification.
 
 ## Locked candidate
 
 - ISO: `layersentry-v1.0-harvester-v1.8.2-amd64.iso`
-- Build source: `a104eab8cc5eca42b7ef002fc96561a21be3f163`
-- Build workflow run: `33479776571`
-- Artifact ID: `9790788698`
-- Bytes: `8180137984`
-- SHA-512: `7f1cd57c363f3b6b592fcbfb90d810c8f12f881e14e097fe17b2833250ee9e57a9831e4398147bd612bc7e3a36a4c45751019473e60eeaa263e5660c996feb81`
+- Build source: `7355b893cae5cef00516f569bd406c5eae985259`
+- Build workflow: `LayerSentry v1.0 generated offline image-set lock`
+- Build workflow run: `33716608731`
+- Build job ID: `100527008929`
+- ISO artifact ID: `9879403683`
+- ISO artifact name: `layersentry-v1.0-harvester-v1.8.2-amd64-offline-7355b893cae5cef00516f569bd406c5eae985259`
+- ISO bytes: `9369419776`
+- ISO SHA-256: `6d337528fe17714a902b1ca3ab9ed5867fb1c976330bc115a37d5688ac871da4`
+- ISO SHA-512: `e19d266511f440e125dc7cf2da7a6d716b3d60121d7f96fc5aa0f65d53868d281dcc5ac98afd70f994c68750df2f0ac70cbfe512a38053a657765c7f40fd215a`
+- Completed dependency-lock commit: `0a0360023331fc5480cfee7c0cd9005cfa1ddc05`
+- Completed evidence audit run: `33722491906`
+- Completed evidence audit artifact ID: `9880717996`
 
-The script exits before VM creation if the filename, byte count, or SHA-512 differs.
+The script exits before VM creation if the filename, byte count, SHA-256, or SHA-512 differs. The candidate identity is intentionally immutable for this qualification cycle.
 
 ## Default POC profile
 
@@ -83,7 +90,10 @@ After installer completion:
 4. Place the installed OS disk first in firmware boot order.
 5. Reboot from disk and capture the installed-system console.
 6. Verify node readiness and three-node cluster formation.
-7. Run VM/workload smoke tests.
-8. Preserve all evidence against the exact checksum-locked candidate.
+7. Verify LayerSentry branding and installer milestone UX on the installed candidate.
+8. Verify the production-default observability add-ons and only the intended opt-in add-ons.
+9. Run VM/workload and storage smoke tests.
+10. Repeat the required validation with public Internet blocked and an approved internal NTP/DNS path.
+11. Preserve all evidence against the exact checksum-locked candidate.
 
-VM preparation alone must never be reported as `INSTALL_GOOD`.
+VM preparation alone must never be reported as `INSTALL_GOOD`, `AIRGAP_GOOD`, or production approval.
