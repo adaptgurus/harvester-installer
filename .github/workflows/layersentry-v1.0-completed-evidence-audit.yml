@@ -238,7 +238,7 @@ jobs:
           PY
 
           rm -rf "$OUT_DIR/downloaded"
-          sha256sum -c "$OUT_DIR/manifest.sha256" --ignore-missing
+          (cd "$OUT_DIR" && sha256sum -c manifest.sha256)
           cat "$OUT_DIR/FINAL-STATUS.md"
 
       - name: Upload completed evidence audit
