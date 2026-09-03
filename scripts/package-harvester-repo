@@ -14,6 +14,12 @@ mkdir -p ${IMAGES_LISTS_DIR}
 source ${SCRIPTS_DIR}/version
 source ${SCRIPTS_DIR}/lib/image
 
+# Extend only the LayerSentry release bundle with reviewed offline storage and
+# runtime-security dependencies before the cluster-repository image is built.
+if [[ "${DRONE_TAG:-}" == "v1.0" && "${DRONE_BRANCH:-}" == "layersentry-v1.0-dev" ]]; then
+  "${SCRIPTS_DIR}/layersentry/extend-offline-bundle.sh"
+fi
+
 # for image publish in CI
 rm -rf ${DIST_REPO_DIR} && mkdir -p ${DIST_REPO_DIR}
 cp -r ${PACKAGE_HARVESTER_REPO_DIR}/* ${DIST_REPO_DIR}

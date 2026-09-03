@@ -1,0 +1,6 @@
+name: "LayerSentry storage readiness bootstrap"
+stages:
+  initramfs:
+    - name: "enable LayerSentry storage readiness service"
+      systemctl:
+        enable: [layersentry-storage-readiness.service]

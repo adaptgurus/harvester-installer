@@ -1,0 +1,11 @@
+[Unit]
+Description=LayerSentry storage connectivity readiness inventory
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/layersentry-storage-readiness.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

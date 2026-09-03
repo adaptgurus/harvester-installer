@@ -1,0 +1,35 @@
+apiVersion: platform.layersentry.io/v1
+kind: StorageCapabilities
+metadata:
+  product: LayerSentry
+  productVersion: "1.0"
+spec:
+  hostConnectivity:
+    multipath:
+      supported: true
+      activation: Harvester externalStorageConfig
+      longhornVirtualDiskBlacklist: preserved
+    iscsi:
+      supported: true
+      mode: host/non-CSI and vendor-CSI-ready
+      automaticTargetDiscovery: false
+      automaticLogin: false
+    nfs:
+      supported: true
+      hostMount: true
+      csiDriverBundled: true
+      csiDriverVersion: "4.12.0"
+      storageClassPreconfigured: false
+  csi:
+    harvesterConfigurationSetting: csi-driver-config
+    nfs:
+      upstream: kubernetes-csi/csi-driver-nfs
+      version: "4.12.0"
+      defaultEnabled: false
+    genericIscsi:
+      defaultEnabled: false
+      policy: use a qualified vendor CSI driver for production SAN provisioning
+  customerConfiguration:
+    targetsEmbedded: false
+    credentialsEmbedded: false
+    storageClassesEmbedded: false

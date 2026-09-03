@@ -1,0 +1,253 @@
+name: LayerSentry v1.0 expanded offline dependency lock
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-expanded-dependency-lock.yml
+      - provenance/layersentry-v1.0-expanded-images.txt
+      - scripts/layersentry/prepare-runtime-security-chart.py
+      - scripts/provenance/apply_expanded_dependencies.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: layersentry-v1.0-expanded-dependency-lock
+  cancel-in-progress: false
+
+env:
+  LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+  ALIASES_FILE: provenance/layersentry-v1.0-expanded-images.txt
+  HELM_VERSION: v3.20.0
+  HELM_SHA256: dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286
+  NFS_REPOSITORY: https://github.com/kubernetes-csi/csi-driver-nfs.git
+  NFS_COMMIT: 57ba72f46ca0864b16e9523ee71e88878c0a5c48
+  NEUVECTOR_REPOSITORY: https://github.com/neuvector/neuvector-helm.git
+  NEUVECTOR_COMMIT: 501b8f0e5213f2d1f4e1f904892fe86f7fb7e45b
+
+jobs:
+  review-and-lock:
+    name: Review NFS CSI and runtime-security offline dependencies
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact expansion source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fail closed on source and current lock state
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "layersentry-v1.0-dev"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          bash -n scripts/layersentry/extend-offline-bundle.sh
+          bash -n scripts/layersentry/stage-generated-release-aliases.sh
+          python3 -m py_compile \
+            scripts/layersentry/prepare-runtime-security-chart.py \
+            scripts/provenance/apply_expanded_dependencies.py \
+            scripts/provenance/discover_image_digests.py
+          python3 - "$LOCK_FILE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          unresolved = [
+              item.get("id") for item in lock.get("unresolved", [])
+              if isinstance(item, dict) and item.get("id")
+          ]
+          if lock.get("lock_status") != "incomplete":
+              raise SystemExit("expanded dependency lock requires incomplete lock")
+          if unresolved != ["harvester-offline-image-set"]:
+              raise SystemExit(f"unexpected unresolved dependency set: {unresolved}")
+          if len(lock.get("charts", [])) != 13:
+              raise SystemExit("expanded dependency lock expects the reviewed 13-chart baseline")
+          if not lock.get("container_images"):
+              raise SystemExit("reviewed external OCI baseline is missing")
+          PY
+          source_epoch=$(git show -s --format=%ct "$GITHUB_SHA")
+          [[ "$source_epoch" =~ ^[1-9][0-9]*$ ]]
+          echo "SOURCE_DATE_EPOCH=$source_epoch" >> "$GITHUB_ENV"
+
+      - name: Install checksum-locked Helm
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tools="$RUNNER_TEMP/layersentry-expanded-tools"
+          mkdir -p "$tools"
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors \
+            "https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz" \
+            -o "$RUNNER_TEMP/helm-linux-amd64.tar.gz"
+          echo "$HELM_SHA256  $RUNNER_TEMP/helm-linux-amd64.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/helm-linux-amd64.tar.gz" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/linux-amd64/helm" "$tools/helm"
+          echo "$tools" >> "$GITHUB_PATH"
+          "$tools/helm" version --short
+
+      - name: Build expanded charts twice from exact source commits
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          checkout_exact() {
+            local repository=$1 commit=$2 destination=$3
+            git init -q "$destination"
+            git -C "$destination" remote add origin "$repository"
+            git -C "$destination" fetch --quiet --no-tags --depth 1 origin "$commit"
+            git -C "$destination" -c advice.detachedHead=false checkout --quiet --detach FETCH_HEAD
+            test "$(git -C "$destination" rev-parse HEAD)" = "$commit"
+          }
+          build_pass() {
+            local target=$1
+            rm -rf "$target"
+            mkdir -p "$target/nfs" "$target/neuvector" "$target/charts"
+            checkout_exact "$NFS_REPOSITORY" "$NFS_COMMIT" "$target/nfs"
+            checkout_exact "$NEUVECTOR_REPOSITORY" "$NEUVECTOR_COMMIT" "$target/neuvector"
+            nfs_source="$target/nfs/charts/v4.12.0/csi-driver-nfs-4.12.0.tgz"
+            test -s "$nfs_source"
+            cp "$nfs_source" "$target/nfs-source.tgz"
+            cp "$nfs_source" "$target/charts/csi-driver-nfs-4.12.0.tgz"
+            cp -a "$target/neuvector/charts/core" "$target/core"
+            cp -a "$target/neuvector/charts/crd" "$target/crd"
+            python3 scripts/layersentry/prepare-runtime-security-chart.py "$target/core"
+            helm package "$target/core" -d "$target/charts" >/dev/null
+            helm package "$target/crd" -d "$target/charts" >/dev/null
+            python3 scripts/provenance/normalize_chart_archives.py \
+              "$target/charts" \
+              --source-date-epoch "$SOURCE_DATE_EPOCH" \
+              --report "$target/normalization-report.json" >/dev/null
+          }
+          pass1="$RUNNER_TEMP/expanded-pass-1"
+          pass2="$RUNNER_TEMP/expanded-pass-2"
+          build_pass "$pass1"
+          build_pass "$pass2"
+          (cd "$pass1/charts" && sha256sum *.tgz | sort) > "$RUNNER_TEMP/expanded-pass-1.sha256"
+          (cd "$pass2/charts" && sha256sum *.tgz | sort) > "$RUNNER_TEMP/expanded-pass-2.sha256"
+          cmp "$RUNNER_TEMP/expanded-pass-1.sha256" "$RUNNER_TEMP/expanded-pass-2.sha256"
+          echo "EXPANDED_PASS1=$pass1" >> "$GITHUB_ENV"
+          echo "EXPANDED_PASS2=$pass2" >> "$GITHUB_ENV"
+
+      - name: Resolve all new runtime aliases to immutable OCI digests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          evidence="provenance/expanded-dependencies/$GITHUB_SHA"
+          rm -rf "$evidence"
+          mkdir -p "$evidence"
+          python3 scripts/provenance/discover_image_digests.py \
+            --image-list "$ALIASES_FILE" \
+            --output "$evidence/image-lock-candidate.json" \
+            --failures "$evidence/image-resolution-failures.json" \
+            --source-commit "$GITHUB_SHA" \
+            --attempts 4 \
+            --retry-delay 3
+          cp "$ALIASES_FILE" "$evidence/image-aliases.txt"
+          cp "$EXPANDED_PASS1/normalization-report.json" "$evidence/chart-normalization-report.json"
+          cp "$RUNNER_TEMP/expanded-pass-1.sha256" "$evidence/chart-checksums.sha256"
+          echo "EXPANDED_EVIDENCE=$evidence" >> "$GITHUB_ENV"
+
+      - name: Review and append only the expanded dependency set
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/apply_expanded_dependencies.py \
+            --lock "$LOCK_FILE" \
+            --candidate "$EXPANDED_EVIDENCE/image-lock-candidate.json" \
+            --aliases "$ALIASES_FILE" \
+            --charts-dir "$EXPANDED_PASS1/charts" \
+            --nfs-source-archive "$EXPANDED_PASS1/nfs-source.tgz" \
+            --source-commit "$GITHUB_SHA" \
+            --chart-source-date-epoch "$SOURCE_DATE_EPOCH" \
+            --report "$EXPANDED_EVIDENCE/review-dry-run.json"
+          python3 scripts/provenance/apply_expanded_dependencies.py \
+            --lock "$LOCK_FILE" \
+            --candidate "$EXPANDED_EVIDENCE/image-lock-candidate.json" \
+            --aliases "$ALIASES_FILE" \
+            --charts-dir "$EXPANDED_PASS1/charts" \
+            --nfs-source-archive "$EXPANDED_PASS1/nfs-source.tgz" \
+            --source-commit "$GITHUB_SHA" \
+            --chart-source-date-epoch "$SOURCE_DATE_EPOCH" \
+            --report "$EXPANDED_EVIDENCE/review.json" \
+            --apply
+
+      - name: Revalidate expanded lock and immutable coverage
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+          python3 scripts/provenance/verify_lock.py \
+            "$LOCK_FILE" \
+            --repo-root . \
+            --scan-build-inputs \
+            --report "$EXPANDED_EVIDENCE/structural-lock-report.json"
+          python3 - "$LOCK_FILE" "$ALIASES_FILE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          aliases = {
+              line.strip() for line in Path(sys.argv[2]).read_text(encoding="utf-8").splitlines()
+              if line.strip() and not line.lstrip().startswith("#")
+          }
+          if len(lock.get("charts", [])) != 16:
+              raise SystemExit("expanded lock must contain exactly 16 reviewed charts")
+          unresolved = [
+              item.get("id") for item in lock.get("unresolved", [])
+              if isinstance(item, dict) and item.get("id")
+          ]
+          if unresolved != ["harvester-offline-image-set"]:
+              raise SystemExit(f"expanded lock changed unresolved set: {unresolved}")
+          source_components = {
+              item.get("component") for item in lock.get("source_locks", [])
+              if isinstance(item, dict)
+          }
+          required_sources = {"kubernetes-csi-driver-nfs", "neuvector-helm"}
+          if not required_sources.issubset(source_components):
+              raise SystemExit("expanded Git source locks are missing")
+          locked_aliases = {
+              str(alias)
+              for item in lock.get("container_images", []) if isinstance(item, dict)
+              for alias in item.get("aliases", [])
+          }
+          missing = sorted(aliases - locked_aliases)
+          if missing:
+              raise SystemExit(f"expanded aliases missing from lock: {missing}")
+          review = lock.get("reviewed_expanded_dependencies")
+          if not isinstance(review, dict) or review.get("release_approved") is not False:
+              raise SystemExit("expanded review metadata is missing or overclaims approval")
+          PY
+          sha256sum "$EXPANDED_EVIDENCE"/*.json "$EXPANDED_EVIDENCE"/*.txt \
+            > "$EXPANDED_EVIDENCE/evidence-files.sha256"
+
+      - name: Upload expanded dependency review evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-expanded-dependencies-${{ github.sha }}
+          path: |
+            ${{ env.EXPANDED_EVIDENCE }}
+            ${{ env.EXPANDED_PASS1 }}/charts/*.tgz
+            ${{ env.EXPANDED_PASS1 }}/nfs-source.tgz
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit reviewed expansion while keeping finalizer gated
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --quiet origin layersentry-v1.0-dev
+          test "$(git rev-parse origin/layersentry-v1.0-dev)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$LOCK_FILE" "$EXPANDED_EVIDENCE"
+          test -n "$(git status --porcelain)"
+          git commit -m "chore(provenance): lock LayerSentry storage and runtime security dependencies [skip ci]"
+          git push origin HEAD:refs/heads/layersentry-v1.0-dev
+
+# trigger-marker: initial
