@@ -42,6 +42,25 @@ The default node names and intended installer addresses are:
 
 The script records network, DNS, VIP, and NTP inputs as evidence, but it deliberately does not inject installer answers. Enter and verify them in the LayerSentry installer. The NTP field remains editable; `time.google.com` is only the connected-install starting value. Use an approved internal NTP source for the true-air-gap test.
 
+## Source-level installer acceptance criteria
+
+The current LayerSentry installer source is expected to present the following customer-visible behavior. Runtime qualification must verify the exact retained ISO behaves the same way:
+
+- first interactive screen exposes only `Create a new LayerSentry cluster` and `Join an existing LayerSentry cluster`;
+- no interactive `Install Harvester binaries only` option;
+- management networking is static IPv4 in the manual installer;
+- no customer-visible DHCP/Automatic IPv4 method selector in the manual network flow;
+- management NIC guidance tells the operator to use Tab to open the list, Space to select NICs, and Enter to confirm;
+- IPv4 address, mask, gateway and DNS are validated as static management inputs;
+- VIP is static-only in the interactive flow;
+- no editable VIP MAC-address field;
+- a detected MAC may be shown only as read-only conflict evidence;
+- an already-used VIP is rejected and the operator is returned to the VIP input;
+- installation progress shows LayerSentry milestone stages instead of streaming raw package output;
+- installed console/dashboard customer-visible product naming is LayerSentry.
+
+Hidden upstream compatibility identifiers or automatic-install DHCP helpers do not constitute a customer-visible failure when they are not reachable from the manual installer UI.
+
 ## Run
 
 Run from an elevated Windows PowerShell session on the Hyper-V host:
@@ -80,20 +99,59 @@ The manifest binds the VM configuration to the exact ISO identity and explicitly
 - `airgapGood`
 - `releaseGood`
 
+## Installed-node production tools audit
+
+The exact pinned Harvester base-OS package evidence already proves that the retained ISO build input contains the requested production diagnostic packages and HBA/SAS module files. Runtime qualification still verifies the installed node exposes them correctly.
+
+Use the read-only repository audit:
+
+```bash
+sudo bash scripts/qualification/layersentry-node-production-tools-audit.sh \
+  | tee layersentry-node-production-tools-audit.txt
+```
+
+Run it on every installed node and retain each output separately. It validates:
+
+- `nc`
+- `lsscsi`
+- `multipath` / `multipathd`
+- `iscsiadm` / `iscsid`
+- `mount.nfs`
+- `lspci`
+- `lsmod`
+- `modinfo`
+- `dmesg`
+- module metadata for `qla2xxx`, `lpfc`, `mpt3sas`, `megaraid_sas`, and `fnic`;
+- LayerSentry storage-readiness service enablement;
+- generated `/var/lib/layersentry/storage-readiness.yaml`;
+- configuration-driven multipath policy;
+- disabled automatic iSCSI discovery/login;
+- disabled automatic NFS mount policy.
+
+The audit is deliberately read-only. It does not discover iSCSI targets, log in to SANs, mount NFS exports, modify multipath, or force-load HBA modules.
+
+On Hyper-V, physical FC/SAS HBA modules are not expected to appear in `lsmod`; their **module metadata must exist**, while actual hardware binding is deferred to physical HCL qualification. Physical production testing must use `lspci -nnk`, driver/firmware evidence, array/HBA interoperability evidence, multipath topology, failover and performance tests on the supported hardware profile.
+
 ## Installation gate
 
 After installer completion:
 
-1. Capture installer screens and the entered network/NTP values.
-2. Shut down all test VMs.
-3. Detach the ISO from every VM.
-4. Place the installed OS disk first in firmware boot order.
-5. Reboot from disk and capture the installed-system console.
-6. Verify node readiness and three-node cluster formation.
-7. Verify LayerSentry branding and installer milestone UX on the installed candidate.
-8. Verify the production-default observability add-ons and only the intended opt-in add-ons.
-9. Run VM/workload and storage smoke tests.
-10. Repeat the required validation with public Internet blocked and an approved internal NTP/DNS path.
-11. Preserve all evidence against the exact checksum-locked candidate.
+1. Capture the first installer screen and prove only the two LayerSentry create/join choices are selectable.
+2. Capture the management-network screen and prove the manual flow is static IPv4 with no customer-visible DHCP method selector.
+3. Capture NIC selection guidance and verify Tab/Space/Enter interaction.
+4. Capture the VIP screen and prove no editable MAC field exists; also execute an in-use VIP negative test and preserve the rejection evidence.
+5. Capture the entered network/DNS/NTP values for every node.
+6. Complete installation on all required nodes and capture the LayerSentry milestone progress/completion UI.
+7. Shut down all test VMs.
+8. Detach the ISO from every VM.
+9. Place the installed OS disk first in firmware boot order.
+10. Reboot from disk and capture the installed-system LayerSentry console.
+11. Verify node readiness and three-node cluster formation.
+12. Run `scripts/qualification/layersentry-node-production-tools-audit.sh` on every installed node and retain outputs.
+13. Verify LayerSentry branding across installer, installed console, pre-login/login and management UI surfaces applicable to this candidate.
+14. Verify the production-default observability add-ons and only the intended opt-in add-ons.
+15. Run VM/workload and storage smoke tests; do not format SAN LUNs or treat individual multipath legs as independent storage devices.
+16. Repeat the required validation with public Internet blocked and an approved internal NTP/DNS path.
+17. Preserve all evidence against the exact checksum-locked candidate.
 
-VM preparation alone must never be reported as `INSTALL_GOOD`, `AIRGAP_GOOD`, or production approval.
+VM preparation alone must never be reported as `INSTALL_GOOD`, `AIRGAP_GOOD`, `HARDWARE_GOOD`, or production approval.
