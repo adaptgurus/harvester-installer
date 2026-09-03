@@ -1,0 +1,24 @@
+{
+  "airgap_qualified": false,
+  "applied": true,
+  "build_run_id": 33716608731,
+  "build_source_commit": "7355b893cae5cef00516f569bd406c5eae985259",
+  "candidate_sha256": "15c870894d88a2a756f48a078130a9f473a297a325bb25eba1adade18c9bacd0",
+  "dependency_lock_complete": true,
+  "generated_image_count": 3,
+  "generated_image_refs": {
+    "layersentry-generated-harvester-cluster-repo": "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo@sha256:ff21b90618f9d45809302881ea33ee48f498fbd9cea7766947b7c43e69435222",
+    "layersentry-generated-harvester-installer": "ghcr.io/adaptgurus/layersentry-harvester-installer@sha256:3d49fd19f51a527b2a09e3f15bc65cf2d67eeb3c5a10a35c35e49f939797ce59",
+    "layersentry-generated-harvester-os": "ghcr.io/adaptgurus/layersentry-harvester-os@sha256:8c00bd1ee8d138d24df9fe450fbaa8063481184ccd8617b0aeda1c9b4a77fc23"
+  },
+  "installed": false,
+  "iso_sha256": "6d337528fe17714a902b1ca3ab9ed5867fb1c976330bc115a37d5688ac871da4",
+  "lock_status": "complete",
+  "observed_alias_count": 120,
+  "release_approved": false,
+  "remaining_unresolved_count": 0,
+  "remaining_unresolved_ids": [],
+  "removed_unresolved_id": "harvester-offline-image-set",
+  "runtime_qualified": false,
+  "schema": "layersentry.offline-image-set-lock-review/v1"
+}

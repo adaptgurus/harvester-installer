@@ -1,0 +1,49 @@
+{
+  "aggregate_sha256": "053f1ddbfb36381681011353d493d75c76d65e5ab124bcdf56fef1a3c175646c",
+  "file_count": 7,
+  "files": [
+    {
+      "bytes": 2937,
+      "entry_count": 55,
+      "path": "image-lists/harvester/images-lists/harvester-images-v1.0.txt",
+      "sha256": "881766f880fe2ebb98a6993f0ae196084ae3ceb2a75e9ca55f33154a76b247bb"
+    },
+    {
+      "bytes": 46,
+      "entry_count": 1,
+      "path": "image-lists/harvester/images-lists/harvester-repo-images-v1.0.txt",
+      "sha256": "c376123979adeecfe0cc6c86484222d38fee2219d3b21d6482ac5c792022a09d"
+    },
+    {
+      "bytes": 444,
+      "entry_count": 10,
+      "path": "image-lists/harvester/images-lists/layersentry-expanded-images-v1.0.txt",
+      "sha256": "01cd391ae5f8cd71b444f95d4e3d8b2d48b25816cc3a9a9f568106a00d34f7b5"
+    },
+    {
+      "bytes": 1693,
+      "entry_count": 34,
+      "path": "image-lists/harvester/images-lists/rancher-images-v2.14.3.txt",
+      "sha256": "6e8b75319d7949fe561c0fa15177154b16e304c5943e942455e0b75d5bdc6f8a"
+    },
+    {
+      "bytes": 119,
+      "entry_count": 2,
+      "path": "image-lists/harvester/images-lists/rke2-images-multus.linux-amd64-v1.35.7-rke2r1.txt",
+      "sha256": "46558ad1321f57ddad9b9cf154b2f4a5aee1a556902d2db0ef15245bb01812ac"
+    },
+    {
+      "bytes": 1008,
+      "entry_count": 17,
+      "path": "image-lists/harvester/images-lists/rke2-images.linux-amd64-v1.35.7-rke2r1.txt",
+      "sha256": "4233722b84f17e2debdf8a4781acf6600f057e2e1faff6a47a18fb3a3aa44d77"
+    },
+    {
+      "bytes": 118,
+      "entry_count": 2,
+      "path": "image-lists/rancherd/images/rancherd-bootstrap-images-v1.0.txt",
+      "sha256": "05d5cbdf789a45e9a3454e49a9f8f85f1e2bad57c8550c2cce3793364a924ae6"
+    }
+  ],
+  "observed_alias_count": 120
+}

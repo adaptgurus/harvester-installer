@@ -1,0 +1,16 @@
+{
+  "airgap_qualified": false,
+  "build_run_id": 33716608731,
+  "build_source_commit": "7355b893cae5cef00516f569bd406c5eae985259",
+  "dependency_lock_complete": true,
+  "error_count": 0,
+  "errors": [],
+  "generated_image_count": 3,
+  "installed": false,
+  "lock": "provenance/layersentry-v1.0-harvester-v1.8.2.lock.json",
+  "release_approved": false,
+  "repo_root": "/home/runner/work/harvester-installer/harvester-installer",
+  "runtime_qualified": false,
+  "schema": "layersentry.offline-image-set-binding-verification/v1",
+  "verified": true
+}

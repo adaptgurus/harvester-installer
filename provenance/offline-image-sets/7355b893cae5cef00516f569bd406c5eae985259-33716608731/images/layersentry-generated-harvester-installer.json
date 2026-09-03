@@ -1,0 +1,29 @@
+{
+  "architecture": "amd64",
+  "config_digest": "88c5f2034cc908397e92f79ff4ccc7157fde234834ec792d27e2a78ab18599c2",
+  "id": "layersentry-generated-harvester-installer",
+  "os": "linux",
+  "ref": "ghcr.io/adaptgurus/layersentry-harvester-installer@sha256:3d49fd19f51a527b2a09e3f15bc65cf2d67eeb3c5a10a35c35e49f939797ce59",
+  "repo_digests": [
+    "ghcr.io/adaptgurus/layersentry-harvester-installer@sha256:3d49fd19f51a527b2a09e3f15bc65cf2d67eeb3c5a10a35c35e49f939797ce59"
+  ],
+  "rootfs_diff_ids": [
+    "sha256:9fad9add38a85d0abe89eb0281be8f8392f43198128da31e635ac7d8892493c8"
+  ],
+  "rootfs_type": "layers",
+  "runtime_alias": "docker.io/rancher/harvester-installer:v1.0",
+  "runtime_config": {
+    "cmd": null,
+    "entrypoint": null,
+    "environment": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "exposed_ports": [],
+    "labels": {},
+    "user": "",
+    "working_dir": "/"
+  },
+  "schema": "layersentry.generated-image-inspection/v1",
+  "size_bytes": 12251298,
+  "source_alias": "ghcr.io/adaptgurus/layersentry-harvester-installer:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+}

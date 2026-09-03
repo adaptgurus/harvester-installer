@@ -970,6 +970,30 @@
     },
     {
       "aliases": [
+        "docker.io/rancher/harvester-cluster-repo:v1.0",
+        "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+      ],
+      "id": "layersentry-generated-harvester-cluster-repo",
+      "ref": "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo@sha256:ff21b90618f9d45809302881ea33ee48f498fbd9cea7766947b7c43e69435222"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-installer:v1.0",
+        "ghcr.io/adaptgurus/layersentry-harvester-installer:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+      ],
+      "id": "layersentry-generated-harvester-installer",
+      "ref": "ghcr.io/adaptgurus/layersentry-harvester-installer@sha256:3d49fd19f51a527b2a09e3f15bc65cf2d67eeb3c5a10a35c35e49f939797ce59"
+    },
+    {
+      "aliases": [
+        "docker.io/rancher/harvester-os:v1.0",
+        "ghcr.io/adaptgurus/layersentry-harvester-os:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+      ],
+      "id": "layersentry-generated-harvester-os",
+      "ref": "ghcr.io/adaptgurus/layersentry-harvester-os@sha256:8c00bd1ee8d138d24df9fe450fbaa8063481184ccd8617b0aeda1c9b4a77fc23"
+    },
+    {
+      "aliases": [
         "registry.k8s.io/descheduler/descheduler:v0.33.0"
       ],
       "id": "registry-k8s-io-descheduler-descheduler",
@@ -1145,7 +1169,7 @@
     }
   ],
   "generated_at": "2026-09-01T12:38:02Z",
-  "lock_status": "incomplete",
+  "lock_status": "complete",
   "packages": [
     {
       "id": "harvester-base-os-dracut",
@@ -1423,6 +1447,354 @@
     "source_commit": "e69734ad7d5c41b277714c66a46df25566b58eaa",
     "status": "storage-security-reviewed-lock-still-incomplete"
   },
+  "reviewed_offline_image_set": {
+    "airgap_qualified": false,
+    "build_run_id": 33716608731,
+    "build_source_commit": "7355b893cae5cef00516f569bd406c5eae985259",
+    "build_source_tree": "afe7140aab1a71976d27ff7d33f2065ff454c570",
+    "candidate_sha256": "15c870894d88a2a756f48a078130a9f473a297a325bb25eba1adade18c9bacd0",
+    "dependency_lock_complete": true,
+    "image_lists": {
+      "aggregate_sha256": "053f1ddbfb36381681011353d493d75c76d65e5ab124bcdf56fef1a3c175646c",
+      "file_count": 7,
+      "files": [
+        {
+          "bytes": 2937,
+          "entry_count": 55,
+          "path": "image-lists/harvester/images-lists/harvester-images-v1.0.txt",
+          "sha256": "881766f880fe2ebb98a6993f0ae196084ae3ceb2a75e9ca55f33154a76b247bb"
+        },
+        {
+          "bytes": 46,
+          "entry_count": 1,
+          "path": "image-lists/harvester/images-lists/harvester-repo-images-v1.0.txt",
+          "sha256": "c376123979adeecfe0cc6c86484222d38fee2219d3b21d6482ac5c792022a09d"
+        },
+        {
+          "bytes": 444,
+          "entry_count": 10,
+          "path": "image-lists/harvester/images-lists/layersentry-expanded-images-v1.0.txt",
+          "sha256": "01cd391ae5f8cd71b444f95d4e3d8b2d48b25816cc3a9a9f568106a00d34f7b5"
+        },
+        {
+          "bytes": 1693,
+          "entry_count": 34,
+          "path": "image-lists/harvester/images-lists/rancher-images-v2.14.3.txt",
+          "sha256": "6e8b75319d7949fe561c0fa15177154b16e304c5943e942455e0b75d5bdc6f8a"
+        },
+        {
+          "bytes": 119,
+          "entry_count": 2,
+          "path": "image-lists/harvester/images-lists/rke2-images-multus.linux-amd64-v1.35.7-rke2r1.txt",
+          "sha256": "46558ad1321f57ddad9b9cf154b2f4a5aee1a556902d2db0ef15245bb01812ac"
+        },
+        {
+          "bytes": 1008,
+          "entry_count": 17,
+          "path": "image-lists/harvester/images-lists/rke2-images.linux-amd64-v1.35.7-rke2r1.txt",
+          "sha256": "4233722b84f17e2debdf8a4781acf6600f057e2e1faff6a47a18fb3a3aa44d77"
+        },
+        {
+          "bytes": 118,
+          "entry_count": 2,
+          "path": "image-lists/rancherd/images/rancherd-bootstrap-images-v1.0.txt",
+          "sha256": "05d5cbdf789a45e9a3454e49a9f8f85f1e2bad57c8550c2cce3793364a924ae6"
+        }
+      ],
+      "observed_alias_count": 120
+    },
+    "images": [
+      {
+        "aliases": [
+          "docker.io/rancher/harvester-cluster-repo:v1.0",
+          "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+        ],
+        "config_digest": "4fe117eb6751cc1b3dcfdf8c402b695086e373caeda0df96003a0e421b338c8b",
+        "id": "layersentry-generated-harvester-cluster-repo",
+        "platform": "linux/amd64",
+        "ref": "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo@sha256:ff21b90618f9d45809302881ea33ee48f498fbd9cea7766947b7c43e69435222",
+        "rootfs_diff_ids": [
+          "sha256:577e3db3fa71d41f470fe42961e2b481edfbc23bcb19047ebb0a38ba958d1ece",
+          "sha256:a4b978495dc2331248321b4f6fb05141ceb7ac38440a00b87407a394a70e1d96",
+          "sha256:7a2f1ba4ceb70f7bf6df1b8239711c02ab1ea9ec2ae8748ba4fde755a0b17884",
+          "sha256:1fd120f97cd253515a6f612d67b997eb0ef18a99c8e65e42e38c1155b9f816b8"
+        ],
+        "runtime_config": {
+          "cmd": [
+            "nginx",
+            "-g",
+            "daemon off;"
+          ],
+          "entrypoint": null,
+          "environment": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          ],
+          "exposed_ports": [
+            "80/tcp"
+          ],
+          "labels": {
+            "com.suse.bci.base.authors": "https://github.com/SUSE/bci/discussions",
+            "com.suse.bci.base.created": "2026-07-30T07:59:45.294458092Z",
+            "com.suse.bci.base.description": "Image for containers based on SUSE Linux Enterprise Server 16.0.",
+            "com.suse.bci.base.disturl": "obs://build.suse.de/SUSE:SLFO:Products:BCI:16.0/containerkiwi/7ad55602e294006a4f29582d407b795a-base-image",
+            "com.suse.bci.base.eula": "sle-bci",
+            "com.suse.bci.base.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-server-16",
+            "com.suse.bci.base.name": "16.0-23.1",
+            "com.suse.bci.base.reference": "registry.suse.com/bci/bci-base:16.0-23.1",
+            "com.suse.bci.base.release-stage": "released",
+            "com.suse.bci.base.source": "https://sources.suse.com/SUSE:SLFO:Products:BCI:16.0/base-image/7ad55602e294006a4f29582d407b795a/",
+            "com.suse.bci.base.supportlevel": "l3",
+            "com.suse.bci.base.title": "SUSE Linux BCI 16.0 Base",
+            "com.suse.bci.base.until": "2027-11-30",
+            "com.suse.bci.base.url": "https://www.suse.com/products/base-container-images/",
+            "com.suse.bci.base.vendor": "SUSE LLC",
+            "com.suse.bci.base.version": "16.0-23.1",
+            "com.suse.eula": "sle-bci",
+            "com.suse.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-server-16",
+            "com.suse.release-stage": "released",
+            "com.suse.supportlevel": "l3",
+            "com.suse.supportlevel.until": "2027-11-30",
+            "io.artifacthub.package.logo-url": "https://opensource.suse.com/bci/SLE_BCI_logomark_green.svg",
+            "io.artifacthub.package.readme-url": "https://sources.suse.com/SUSE:SLFO:Products:BCI:16.0/base-image/7ad55602e294006a4f29582d407b795a/README.md",
+            "io.layersentry.provenance-rerun": "2026-09-03-storage-security-provenance-bound",
+            "org.openbuildservice.disturl": "obs://build.suse.de/SUSE:SLFO:Products:BCI:16.0/containerkiwi/7ad55602e294006a4f29582d407b795a-base-image",
+            "org.opencontainers.image.authors": "https://github.com/SUSE/bci/discussions",
+            "org.opencontainers.image.created": "2026-07-30T07:59:45.294458092Z",
+            "org.opencontainers.image.description": "Image for containers based on SUSE Linux Enterprise Server 16.0.",
+            "org.opencontainers.image.ref.name": "16.0-23.1",
+            "org.opencontainers.image.source": "https://sources.suse.com/SUSE:SLFO:Products:BCI:16.0/base-image/7ad55602e294006a4f29582d407b795a/",
+            "org.opencontainers.image.title": "SUSE Linux BCI 16.0 Base",
+            "org.opencontainers.image.url": "https://www.suse.com/products/base-container-images/",
+            "org.opencontainers.image.vendor": "SUSE LLC",
+            "org.opencontainers.image.version": "16.0-23.1",
+            "org.opensuse.reference": "registry.suse.com/bci/bci-base:16.0-23.1"
+          },
+          "user": "nginx",
+          "working_dir": ""
+        },
+        "sbom": {
+          "bytes": 4930035,
+          "format": "SPDX JSON",
+          "package_count": 130,
+          "path": "sboms/layersentry-generated-harvester-cluster-repo.spdx.json",
+          "sha256": "4960208b95b32787f01a7478dda9ae68478b865706cb7dabff04a4e6a966ec55"
+        },
+        "size_bytes": 176896326
+      },
+      {
+        "aliases": [
+          "docker.io/rancher/harvester-installer:v1.0",
+          "ghcr.io/adaptgurus/layersentry-harvester-installer:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+        ],
+        "config_digest": "88c5f2034cc908397e92f79ff4ccc7157fde234834ec792d27e2a78ab18599c2",
+        "id": "layersentry-generated-harvester-installer",
+        "platform": "linux/amd64",
+        "ref": "ghcr.io/adaptgurus/layersentry-harvester-installer@sha256:3d49fd19f51a527b2a09e3f15bc65cf2d67eeb3c5a10a35c35e49f939797ce59",
+        "rootfs_diff_ids": [
+          "sha256:9fad9add38a85d0abe89eb0281be8f8392f43198128da31e635ac7d8892493c8"
+        ],
+        "runtime_config": {
+          "cmd": null,
+          "entrypoint": null,
+          "environment": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          ],
+          "exposed_ports": [],
+          "labels": {},
+          "user": "",
+          "working_dir": "/"
+        },
+        "sbom": {
+          "bytes": 87512,
+          "format": "SPDX JSON",
+          "package_count": 59,
+          "path": "sboms/layersentry-generated-harvester-installer.spdx.json",
+          "sha256": "731911d2462622fc9d268ece9b4e70fdc6ae9d94b84bfe7817186fd3d7e6e341"
+        },
+        "size_bytes": 12251298
+      },
+      {
+        "aliases": [
+          "docker.io/rancher/harvester-os:v1.0",
+          "ghcr.io/adaptgurus/layersentry-harvester-os:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+        ],
+        "config_digest": "7b1aa910029e327718740b358dcd951cb6868ba5bf90a922f62b4caa30a1b7a6",
+        "id": "layersentry-generated-harvester-os",
+        "platform": "linux/amd64",
+        "ref": "ghcr.io/adaptgurus/layersentry-harvester-os@sha256:8c00bd1ee8d138d24df9fe450fbaa8063481184ccd8617b0aeda1c9b4a77fc23",
+        "rootfs_diff_ids": [
+          "sha256:9a8cec9d9bd7def0d01bf04232ebef762ccb00e20092e4e8f7fcc716fc3666c6",
+          "sha256:13a614dcacf21ee0cc09813f8ef47d24911a228188b5280964695ee3d6da2d95",
+          "sha256:c9a26ed134abfa5c653a8baac74c0b622bc51ff3342e98ca7e5a0fdce5fa2fc9",
+          "sha256:bf3e8d68603db6804d495a914a7025d4be92958e71229b96f020fc0f78ac39c0",
+          "sha256:bbb7edfaa8fae52b29c32687a1d9dd53c36f1be23cb2a214e7a299801f24ab91",
+          "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+          "sha256:ba7090d7bc82e86aaa1b82ad851b6a984e2ce352c70f595520e425d228b2a631",
+          "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+          "sha256:35b519c8d1bed80a6c3d8624ce7e98eb6e180d6f05fe51baca1e3d08b0fc1758",
+          "sha256:997a58812fcc53d28324adb1c408235bf2f2dd582e199d93cf8042d95086fded",
+          "sha256:ab9ebfc4cfbf0b77cf95ccb734ba156eeabdcea60a7aba0a05d72553b4692322",
+          "sha256:9ffd22085305ee02c6085360c37d6491fcf2c2fdf1ac4fc9d10c2f48599bd48a",
+          "sha256:1d76a3e1f67bcbef2ed45b42828dd0bdb873290038177f3c33132d16af28ca0c",
+          "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+          "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+          "sha256:8bd2dbe637582c9e80004fbe71f117c8ad3514d45182d45e2164054cb9126544",
+          "sha256:ce4fbcb6655d5884c729c66d7ec449fdb9c06970d54ec156767b4b6f29f61905",
+          "sha256:e8d5deccef349057f7a7b3fd22bf7a2a1106518e63ac3f23e596e07ecc807a69",
+          "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+          "sha256:510e23f2657c24feecd7c1c2832faecc4869ecbb7083a05494d9315466bba07f",
+          "sha256:f6ac2682916bd00d6162602934c629675bcead6916acde3410cd5159ea328777",
+          "sha256:a9fb8395ec83e9c3e023894dd63e2d273ec2ff8b6601efbf5219648c027c2ea8",
+          "sha256:4fbf56a7c65ade0631ed6f445f26ac76e033d60c3b82c500af3b3524128cc937",
+          "sha256:634571a6249c3c4f7eb25c38bcb4c125b66e7eaef1e400463d54855c5fb2f9e4",
+          "sha256:12c89a0956c23ee7ff21fcb2b7262d501cde4287e0e2c1e79e9c84c7686129f6"
+        ],
+        "runtime_config": {
+          "cmd": null,
+          "entrypoint": null,
+          "environment": [
+            "ARCH=amd64",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "WHARFIE_SUM=WHARFIE_SUM_amd64"
+          ],
+          "exposed_ports": [],
+          "labels": {
+            "com.suse.eula": "sle-eula",
+            "com.suse.image-type": "sl-micro",
+            "com.suse.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-micro",
+            "com.suse.release-stage": "released",
+            "com.suse.sl.micro.created": "2026-08-05T16:36:31.166186004Z",
+            "com.suse.sl.micro.description": "SUSE Linux Micro Baremetal OS - a containerized OS layer for Kubernetes.",
+            "com.suse.sl.micro.disturl": "obs://build.suse.de/SUSE:SLFO:Products:SL-Micro:6.2/containerfile/4d7dc325c35c0f5cd3b03a1243b47f1f-SL-Micro-baremetal-container",
+            "com.suse.sl.micro.eula": "sle-eula",
+            "com.suse.sl.micro.image-type": "sl-micro",
+            "com.suse.sl.micro.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-micro",
+            "com.suse.sl.micro.reference": "registry.suse.com/suse/sl-micro/6.2/baremetal-os-container:2.3.1-8.93",
+            "com.suse.sl.micro.release-stage": "released",
+            "com.suse.sl.micro.source": "https://sources.suse.com/SUSE:SLFO:Products:SL-Micro:6.2/SL-Micro-baremetal-container/4d7dc325c35c0f5cd3b03a1243b47f1f/",
+            "com.suse.sl.micro.supportlevel": "l3",
+            "com.suse.sl.micro.title": "SUSE Linux Micro Baremetal OS Container",
+            "com.suse.sl.micro.url": "https://www.suse.com/products/micro/",
+            "com.suse.sl.micro.vendor": "SUSE LLC",
+            "com.suse.sl.micro.version": "2.3.1-8.93",
+            "com.suse.supportlevel": "l3",
+            "io.buildah.version": "1.39.4",
+            "org.openbuildservice.disturl": "obs://build.opensuse.org/isv:Rancher:Harvester:OS:v1.8/main/96048d48701d86e24ce9d8a470b478ce-baseos",
+            "org.opencontainers.image.created": "2026-08-05T16:36:31.166186004Z",
+            "org.opencontainers.image.description": "SUSE Linux Micro Baremetal OS - a containerized OS layer for Kubernetes.",
+            "org.opencontainers.image.source": "https://sources.suse.com/SUSE:SLFO:Products:SL-Micro:6.2/SL-Micro-baremetal-container/4d7dc325c35c0f5cd3b03a1243b47f1f/",
+            "org.opencontainers.image.title": "SUSE Linux Micro Baremetal OS Container",
+            "org.opencontainers.image.url": "https://www.suse.com/products/micro/",
+            "org.opencontainers.image.vendor": "SUSE LLC",
+            "org.opencontainers.image.version": "2.3.1-8.93",
+            "org.opensuse.reference": "registry.suse.com/suse/sl-micro/6.2/baremetal-os-container:2.3.1-8.93"
+          },
+          "user": "",
+          "working_dir": "/"
+        },
+        "sbom": {
+          "bytes": 29810406,
+          "format": "SPDX JSON",
+          "package_count": 4133,
+          "path": "sboms/layersentry-generated-harvester-os.spdx.json",
+          "sha256": "564548853e1dad3d9cb5c4d8ddc1f860f8a4dc28ab27a640d5a48bfbc559d4e2"
+        },
+        "size_bytes": 2915155035
+      }
+    ],
+    "installed": false,
+    "iso_candidate": {
+      "bytes": 9369419776,
+      "path": "dist/artifacts/harvester-v1.0-amd64.iso",
+      "sha256": "6d337528fe17714a902b1ca3ab9ed5867fb1c976330bc115a37d5688ac871da4",
+      "sha512": "e19d266511f440e125dc7cf2da7a6d716b3d60121d7f96fc5aa0f65d53868d281dcc5ac98afd70f994c68750df2f0ac70cbfe512a38053a657765c7f40fd215a"
+    },
+    "release_approved": false,
+    "runtime_qualified": false,
+    "source_inputs": [
+      {
+        "bytes": 21497,
+        "path": ".github/workflows/layersentry-v1.0-offline-image-set-lock.yml",
+        "sha256": "3c58ca1b818cb3942d7a31f19be757d1ea23dfe2b2ae1f307c2e0f4013209a56"
+      },
+      {
+        "bytes": 129,
+        "path": "package/harvester-installer/Dockerfile",
+        "sha256": "f320724747aadb87c5b489e55b61ec5ba1f50455dc80e9811720993e96da967d"
+      },
+      {
+        "bytes": 1576,
+        "path": "package/harvester-os/Dockerfile",
+        "sha256": "1787b653607912b93cc5238542476e470b0da939727a0d63cffafd4438e14980"
+      },
+      {
+        "bytes": 817,
+        "path": "package/harvester-repo/Dockerfile",
+        "sha256": "aaac28bd7695de4585e47f18d635f288e372040111902e1f673b2c8cfd5c3bfa"
+      },
+      {
+        "bytes": 5187,
+        "path": "scripts/build",
+        "sha256": "496da529177a65ba0166a4a75e33029d2aab9001ee7deb17bd27d82d27e8eb1f"
+      },
+      {
+        "bytes": 15222,
+        "path": "scripts/build-bundle",
+        "sha256": "158fdeb46b80325ffeab06a7e2e439df22e94083b5b3854931e2c8812e891e1b"
+      },
+      {
+        "bytes": 1182,
+        "path": "scripts/default",
+        "sha256": "a2f993330cda9f37876be26613bb99ca9e680c184edc3478dcaa6461249b76e0"
+      },
+      {
+        "bytes": 4050,
+        "path": "scripts/lib/image",
+        "sha256": "38e73c12b93a353d8f59e4ee5f6ac55696ef1d41f926082ca416f0bb63871c39"
+      },
+      {
+        "bytes": 573,
+        "path": "scripts/package-harvester-installer",
+        "sha256": "b64c2076a298728c24204984cc2a2d2c6478f3daaf95440cf06296244d56a529"
+      },
+      {
+        "bytes": 10352,
+        "path": "scripts/package-harvester-os",
+        "sha256": "e9a6180c80e1339513f285f86844cc4cfa5e089ba50ef4916da9cf96b2f54794"
+      },
+      {
+        "bytes": 4987,
+        "path": "scripts/package-harvester-repo",
+        "sha256": "0677a81bc58d1db2294674ef46a211f3ee0d9b381ef3497e8abe14f2024326b5"
+      },
+      {
+        "bytes": 13186,
+        "path": "scripts/provenance/collect_offline_image_set_evidence.sh",
+        "sha256": "915251315452f59676f2c88e9ae26f2db56eacca7d57b0e6ef9d90b297734515"
+      },
+      {
+        "bytes": 10181,
+        "path": "scripts/provenance/prepare_finalizer_iso_evidence.sh",
+        "sha256": "3878be0413c77b7a495d6c0f5882c4f52cb6c9c89571572dfeab473cea929200"
+      },
+      {
+        "bytes": 18343,
+        "path": "scripts/provenance/review_offline_image_set.py",
+        "sha256": "4c5af92f4ee152cf7885bd157b6f3ea8f82b93350bca9bbb13af70e3b9967cfa"
+      },
+      {
+        "bytes": 14837,
+        "path": "scripts/provenance/verify_offline_image_set_binding.py",
+        "sha256": "2c55b4fd6d28cf1ef9fe5a6ecfb8fb619f4475f19018877791f09e252b8ba068"
+      },
+      {
+        "bytes": 7935,
+        "path": "tests/test_offline_image_set_lock.py",
+        "sha256": "9bea708ac6d438b6ea1d92d7c285712aecad5706a9b697869a8827c19d1dc005"
+      }
+    ],
+    "status": "generated-images-reviewed-dependency-lock-complete-runtime-gates-pending"
+  },
   "reviewed_os_package_inputs": {
     "base_os_alias": "docker.io/rancher/harvester-os:v1.8-20260806",
     "base_os_ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
@@ -1466,16 +1838,22 @@
       "version_label": "v1.8.2"
     },
     {
+      "commit": "57ba72f46ca0864b16e9523ee71e88878c0a5c48",
+      "component": "kubernetes-csi-driver-nfs",
+      "repository": "https://github.com/kubernetes-csi/csi-driver-nfs.git",
+      "version_label": "v4.12.0"
+    },
+    {
       "commit": "7ae44e73432fa4f1dc966b64be11d6c5710bea81",
       "component": "layersentry-controller",
       "repository": "https://github.com/adaptgurus/harvester-installer.git",
       "version_label": "v1.0.0"
     },
     {
-      "commit": "57ba72f46ca0864b16e9523ee71e88878c0a5c48",
-      "component": "kubernetes-csi-driver-nfs",
-      "repository": "https://github.com/kubernetes-csi/csi-driver-nfs.git",
-      "version_label": "v4.12.0"
+      "commit": "7355b893cae5cef00516f569bd406c5eae985259",
+      "component": "layersentry-offline-image-set-build",
+      "repository": "https://github.com/adaptgurus/harvester-installer.git",
+      "version_label": "v1.0"
     },
     {
       "commit": "501b8f0e5213f2d1f4e1f904892fe86f7fb7e45b",
@@ -1702,15 +2080,5 @@
       "version": "v4.52.5"
     }
   ],
-  "unresolved": [
-    {
-      "external_registry_aliases_locked": 116,
-      "external_registry_refs_locked": 116,
-      "id": "harvester-offline-image-set",
-      "kind": "container-image-set",
-      "required_resolution": "External registry aliases are digest-locked. Capture and verify locally generated harvester-cluster-repo, installer and OS image identities in the deterministic build evidence, then prove final ISO image-list coverage.",
-      "review_report": "provenance/reviews/4d144ceaa429d66afdfed43ed5988d53f9e6f76c/external-image-review.json",
-      "reviewed_discovery_source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c"
-    }
-  ]
+  "unresolved": []
 }

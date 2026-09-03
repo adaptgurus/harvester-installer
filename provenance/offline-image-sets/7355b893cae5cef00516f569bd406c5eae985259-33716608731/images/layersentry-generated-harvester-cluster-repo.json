@@ -1,0 +1,74 @@
+{
+  "architecture": "amd64",
+  "config_digest": "4fe117eb6751cc1b3dcfdf8c402b695086e373caeda0df96003a0e421b338c8b",
+  "id": "layersentry-generated-harvester-cluster-repo",
+  "os": "linux",
+  "ref": "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo@sha256:ff21b90618f9d45809302881ea33ee48f498fbd9cea7766947b7c43e69435222",
+  "repo_digests": [
+    "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo@sha256:ff21b90618f9d45809302881ea33ee48f498fbd9cea7766947b7c43e69435222"
+  ],
+  "rootfs_diff_ids": [
+    "sha256:577e3db3fa71d41f470fe42961e2b481edfbc23bcb19047ebb0a38ba958d1ece",
+    "sha256:a4b978495dc2331248321b4f6fb05141ceb7ac38440a00b87407a394a70e1d96",
+    "sha256:7a2f1ba4ceb70f7bf6df1b8239711c02ab1ea9ec2ae8748ba4fde755a0b17884",
+    "sha256:1fd120f97cd253515a6f612d67b997eb0ef18a99c8e65e42e38c1155b9f816b8"
+  ],
+  "rootfs_type": "layers",
+  "runtime_alias": "docker.io/rancher/harvester-cluster-repo:v1.0",
+  "runtime_config": {
+    "cmd": [
+      "nginx",
+      "-g",
+      "daemon off;"
+    ],
+    "entrypoint": null,
+    "environment": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "exposed_ports": [
+      "80/tcp"
+    ],
+    "labels": {
+      "com.suse.bci.base.authors": "https://github.com/SUSE/bci/discussions",
+      "com.suse.bci.base.created": "2026-07-30T07:59:45.294458092Z",
+      "com.suse.bci.base.description": "Image for containers based on SUSE Linux Enterprise Server 16.0.",
+      "com.suse.bci.base.disturl": "obs://build.suse.de/SUSE:SLFO:Products:BCI:16.0/containerkiwi/7ad55602e294006a4f29582d407b795a-base-image",
+      "com.suse.bci.base.eula": "sle-bci",
+      "com.suse.bci.base.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-server-16",
+      "com.suse.bci.base.name": "16.0-23.1",
+      "com.suse.bci.base.reference": "registry.suse.com/bci/bci-base:16.0-23.1",
+      "com.suse.bci.base.release-stage": "released",
+      "com.suse.bci.base.source": "https://sources.suse.com/SUSE:SLFO:Products:BCI:16.0/base-image/7ad55602e294006a4f29582d407b795a/",
+      "com.suse.bci.base.supportlevel": "l3",
+      "com.suse.bci.base.title": "SUSE Linux BCI 16.0 Base",
+      "com.suse.bci.base.until": "2027-11-30",
+      "com.suse.bci.base.url": "https://www.suse.com/products/base-container-images/",
+      "com.suse.bci.base.vendor": "SUSE LLC",
+      "com.suse.bci.base.version": "16.0-23.1",
+      "com.suse.eula": "sle-bci",
+      "com.suse.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-server-16",
+      "com.suse.release-stage": "released",
+      "com.suse.supportlevel": "l3",
+      "com.suse.supportlevel.until": "2027-11-30",
+      "io.artifacthub.package.logo-url": "https://opensource.suse.com/bci/SLE_BCI_logomark_green.svg",
+      "io.artifacthub.package.readme-url": "https://sources.suse.com/SUSE:SLFO:Products:BCI:16.0/base-image/7ad55602e294006a4f29582d407b795a/README.md",
+      "io.layersentry.provenance-rerun": "2026-09-03-storage-security-provenance-bound",
+      "org.openbuildservice.disturl": "obs://build.suse.de/SUSE:SLFO:Products:BCI:16.0/containerkiwi/7ad55602e294006a4f29582d407b795a-base-image",
+      "org.opencontainers.image.authors": "https://github.com/SUSE/bci/discussions",
+      "org.opencontainers.image.created": "2026-07-30T07:59:45.294458092Z",
+      "org.opencontainers.image.description": "Image for containers based on SUSE Linux Enterprise Server 16.0.",
+      "org.opencontainers.image.ref.name": "16.0-23.1",
+      "org.opencontainers.image.source": "https://sources.suse.com/SUSE:SLFO:Products:BCI:16.0/base-image/7ad55602e294006a4f29582d407b795a/",
+      "org.opencontainers.image.title": "SUSE Linux BCI 16.0 Base",
+      "org.opencontainers.image.url": "https://www.suse.com/products/base-container-images/",
+      "org.opencontainers.image.vendor": "SUSE LLC",
+      "org.opencontainers.image.version": "16.0-23.1",
+      "org.opensuse.reference": "registry.suse.com/bci/bci-base:16.0-23.1"
+    },
+    "user": "nginx",
+    "working_dir": ""
+  },
+  "schema": "layersentry.generated-image-inspection/v1",
+  "size_bytes": 176896326,
+  "source_alias": "ghcr.io/adaptgurus/layersentry-harvester-cluster-repo:source-7355b893cae5cef00516f569bd406c5eae985259-run-33716608731"
+}
