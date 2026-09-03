@@ -8,16 +8,91 @@ PACKAGE_HARVESTER_REPO_DIR="${TOP_DIR}/package/harvester-repo"
 BUNDLE_DIR="${PACKAGE_HARVESTER_OS_DIR}/iso/bundle"
 IMAGES_DIR="${BUNDLE_DIR}/harvester/images"
 IMAGES_LISTS_DIR="${BUNDLE_DIR}/harvester/images-lists"
+LOCK_FILE="${TOP_DIR}/provenance/layersentry-v1.0-harvester-v1.8.2.lock.json"
 
 mkdir -p ${IMAGES_DIR}
 mkdir -p ${IMAGES_LISTS_DIR}
 source ${SCRIPTS_DIR}/version
 source ${SCRIPTS_DIR}/lib/image
 
-# Extend only the LayerSentry release bundle with reviewed offline storage and
-# runtime-security dependencies before the cluster-repository image is built.
 if [[ "${DRONE_TAG:-}" == "v1.0" && "${DRONE_BRANCH:-}" == "layersentry-v1.0-dev" ]]; then
+  # The generic finalizer normalizer uses the build-source epoch. Re-bind the
+  # baseline charts here to the exact epoch/checksums reviewed in the chart lock
+  # before adding the separately reviewed LayerSentry expansion charts.
+  baseline_epoch=$(python3 - "$LOCK_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
+lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+review = lock.get("reviewed_chart_discovery")
+if not isinstance(review, dict):
+    raise SystemExit("reviewed baseline chart discovery is missing")
+epoch = review.get("source_date_epoch")
+if not isinstance(epoch, int) or epoch <= 0:
+    raise SystemExit("reviewed baseline chart epoch is invalid")
+print(epoch)
+PY
+  )
+  python3 "${SCRIPTS_DIR}/provenance/normalize_chart_archives.py" \
+    "${PACKAGE_HARVESTER_REPO_DIR}/charts" \
+    --source-date-epoch "$baseline_epoch" \
+    --report "${TOP_DIR}/dist/baseline-chart-normalization-report.json" >/dev/null
+
+  python3 - "$LOCK_FILE" "$PACKAGE_HARVESTER_REPO_DIR/charts" baseline <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+charts_dir = Path(sys.argv[2])
+expanded = set((lock.get("reviewed_expanded_dependencies") or {}).get("chart_ids") or [])
+expected = {
+    item["archive"]: item
+    for item in lock.get("charts", [])
+    if isinstance(item, dict) and item.get("id") not in expanded
+}
+actual = {path.name for path in charts_dir.glob("*.tgz") if path.is_file()}
+if actual != set(expected):
+    raise SystemExit(
+        f"baseline chart archive set differs from reviewed lock: "
+        f"missing={sorted(set(expected)-actual)} extra={sorted(actual-set(expected))}"
+    )
+for archive, item in expected.items():
+    path = charts_dir / archive
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != item.get("sha256") or path.stat().st_size != item.get("bytes"):
+        raise SystemExit(f"baseline chart differs from reviewed lock: {item.get('id')}")
+print(f"LAYERSENTRY BASELINE CHART LOCK BINDING: PASS ({len(expected)} charts)")
+PY
+
   "${SCRIPTS_DIR}/layersentry/extend-offline-bundle.sh"
+
+  python3 - "$LOCK_FILE" "$PACKAGE_HARVESTER_REPO_DIR/charts" final <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+charts_dir = Path(sys.argv[2])
+expected = {
+    item["archive"]: item
+    for item in lock.get("charts", [])
+    if isinstance(item, dict)
+}
+actual = {path.name for path in charts_dir.glob("*.tgz") if path.is_file()}
+if actual != set(expected):
+    raise SystemExit(
+        f"final chart archive set differs from reviewed lock: "
+        f"missing={sorted(set(expected)-actual)} extra={sorted(actual-set(expected))}"
+    )
+for archive, item in expected.items():
+    path = charts_dir / archive
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != item.get("sha256") or path.stat().st_size != item.get("bytes"):
+        raise SystemExit(f"final chart differs from reviewed lock: {item.get('id')}")
+print(f"LAYERSENTRY FINAL CHART LOCK BINDING: PASS ({len(expected)} charts)")
+PY
+  helm repo index "$PACKAGE_HARVESTER_REPO_DIR/charts"
 fi
 
 # for image publish in CI
