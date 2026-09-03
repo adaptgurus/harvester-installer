@@ -22,6 +22,7 @@ fi
 release_iso="$output_dir/layersentry-v1.0-harvester-v1.8.2-amd64.iso"
 cp "${full_isos[0]}" "$release_iso"
 
+sha256sum "$release_iso" > "${release_iso}.sha256"
 sha512sum "$release_iso" > "${release_iso}.sha512"
 stat -c '%s' "$release_iso" > "${release_iso}.bytes"
 git rev-parse HEAD > "$output_dir/source-commit.txt"
@@ -46,12 +47,28 @@ grep -F 'kubernetes: v1.35.7+rke2r1' "$output_dir/iso-metadata/harvester-release
 grep -F 'rancher: v2.14.3' "$output_dir/iso-metadata/harvester-release.yaml"
 grep -F 'kubevirt: 1.7.4-150700.3.24.2' "$output_dir/iso-metadata/harvester-release.yaml"
 
-harvester_image_list="$output_dir/iso-metadata/image-lists/harvester-images-v1.0.txt"
-[[ -f "$harvester_image_list" ]]
+mapfile -t harvester_image_lists < <(
+  find "$output_dir/iso-metadata/image-lists" -maxdepth 1 -type f \
+    -name 'harvester-images-*.txt' -print | sort
+)
+if [[ ${#harvester_image_lists[@]} -ne 1 ]]; then
+  echo "Expected exactly one generated Harvester image list, found ${#harvester_image_lists[@]}" >&2
+  printf '%s\n' "${harvester_image_lists[@]}" >&2
+  exit 1
+fi
+harvester_image_list=${harvester_image_lists[0]}
+
 grep -F 'docker.io/rancher/harvester:v1.8.2' "$harvester_image_list"
 grep -F 'docker.io/rancher/harvester-webhook:v1.8.2' "$harvester_image_list"
 grep -F 'docker.io/rancher/harvester-upgrade:v1.8.2' "$harvester_image_list"
 grep -R -F 'docker.io/longhornio/longhorn-manager:v1.11.2' "$output_dir/iso-metadata/image-lists"
+
+# Production baseline observability must be physically present in the full-offline ISO.
+grep -R -F 'docker.io/rancher/mirrored-kube-logging-logging-operator:4.10.0' "$output_dir/iso-metadata/image-lists"
+grep -R -F 'docker.io/rancher/mirrored-kube-logging-fluentd:v1.16-4.10-full' "$output_dir/iso-metadata/image-lists"
+grep -R -F 'docker.io/rancher/prom-prometheus:v3.5.0' "$output_dir/iso-metadata/image-lists"
+grep -R -F 'docker.io/rancher/appco-grafana:12.1.1-2.2' "$output_dir/iso-metadata/image-lists"
+grep -R -F 'docker.io/rancher/appco-alertmanager:0.28.1-12.7' "$output_dir/iso-metadata/image-lists"
 
 if grep -RE 'rancher/(harvester|harvester-webhook|harvester-upgrade):v1\.8-head|0\.0\.0-v1\.8-[0-9a-f]{8}|Harvester [0-9a-f]{8}' \
   "$output_dir/iso-metadata/image-lists" "$output_dir/iso-metadata/harvester-release.yaml"; then
@@ -61,6 +78,7 @@ fi
 
 source_commit=$(tr -d '[:space:]' < "$output_dir/source-commit.txt")
 iso_bytes=$(tr -d '[:space:]' < "${release_iso}.bytes")
+iso_sha256=$(awk '{print $1}' "${release_iso}.sha256")
 iso_sha512=$(awk '{print $1}' "${release_iso}.sha512")
 
 cat > "$output_dir/build-manifest.yaml" <<EOF
@@ -82,15 +100,31 @@ source:
 iso:
   filename: layersentry-v1.0-harvester-v1.8.2-amd64.iso
   bytes: ${iso_bytes}
+  sha256: ${iso_sha256}
   sha512: ${iso_sha512}
   classification: BUILD_GOOD
+productionAddons:
+  enabledByDefault:
+    - rancher-logging
+    - rancher-monitoring
+  bundledButDefaultDisabled:
+    - harvester-vm-import-controller
+    - harvester-pcidevices-controller
+    - harvester-seeder
+    - nvidia-driver-toolkit
+    - kubeovn-operator
+    - descheduler
+  policy: stable baseline observability is enabled unless explicitly overridden; experimental and hardware-specific add-ons remain opt-in
 verified:
   checksumGenerated: true
+  sha256Generated: true
+  sha512Generated: true
   exactByteCountGenerated: true
   isoVolumeId: COS_LIVE
   elToritoBootMetadataPresent: true
   embeddedReleaseMetadata: true
   releaseImageTags: true
+  productionObservabilityImagesBundled: true
   harvesterDevelopmentRefsAbsent: true
   harvesterRelease: v1.8.2
   harvesterChartRelease: 1.8.2
@@ -117,7 +151,9 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     echo '- Classification: `BUILD_GOOD`'
     echo "- Source commit: `${source_commit}`"
     echo "- ISO bytes: `${iso_bytes}`"
+    echo "- ISO SHA-256: `${iso_sha256}`"
     echo "- ISO SHA-512: `${iso_sha512}`"
+    echo '- Production baseline add-ons: `rancher-logging`, `rancher-monitoring`'
     echo '- Harvester: `v1.8.2`'
     echo '- RKE2: `v1.35.7+rke2r1`'
     echo '- Rancher: `v2.14.3`'
