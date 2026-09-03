@@ -53,17 +53,25 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $Candidate = [ordered]@{
-    product              = "LayerSentry"
-    productVersion       = "1.0"
-    harvesterVersion     = "v1.8.2"
-    installerCommit      = "a104eab8cc5eca42b7ef002fc96561a21be3f163"
-    buildWorkflowRunId   = "33479776571"
-    buildJobId           = "99766588639"
-    artifactId           = "9790788698"
-    isoFilename          = "layersentry-v1.0-harvester-v1.8.2-amd64.iso"
-    isoBytes             = [int64]8180137984
-    isoSha512            = "7f1cd57c363f3b6b592fcbfb90d810c8f12f881e14e097fe17b2833250ee9e57a9831e4398147bd612bc7e3a36a4c45751019473e60eeaa263e5660c996feb81"
+    product                = "LayerSentry"
+    productVersion         = "1.0"
+    harvesterVersion       = "v1.8.2"
+    installerCommit        = "7355b893cae5cef00516f569bd406c5eae985259"
+    buildWorkflowRunId     = "33716608731"
+    buildJobId             = "100527008929"
+    artifactId             = "9879403683"
+    evidenceAuditRunId     = "33722491906"
+    evidenceAuditArtifactId = "9880717996"
+    completedLockCommit    = "0a0360023331fc5480cfee7c0cd9005cfa1ddc05"
+    isoFilename            = "layersentry-v1.0-harvester-v1.8.2-amd64.iso"
+    isoBytes               = [int64]9369419776
+    isoSha256              = "6d337528fe17714a902b1ca3ab9ed5867fb1c976330bc115a37d5688ac871da4"
+    isoSha512              = "e19d266511f440e125dc7cf2da7a6d716b3d60121d7f96fc5aa0f65d53868d281dcc5ac98afd70f994c68750df2f0ac70cbfe512a38053a657765c7f40fd215a"
     startingClassification = "BUILD_GOOD"
+    installationQualified  = $false
+    runtimeQualified       = $false
+    airgapQualified        = $false
+    releaseApproved        = $false
 }
 
 function Assert-Administrator {
@@ -177,6 +185,11 @@ if ([int64]$isoItem.Length -ne $Candidate.isoBytes) {
     throw "ISO byte-size mismatch. Expected $($Candidate.isoBytes), found $($isoItem.Length)."
 }
 
+$actualSha256 = (Get-FileHash -LiteralPath $resolvedIso -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualSha256 -ne $Candidate.isoSha256) {
+    throw "ISO SHA-256 mismatch. Refusing to create qualification VMs."
+}
+
 $actualSha512 = (Get-FileHash -LiteralPath $resolvedIso -Algorithm SHA512).Hash.ToLowerInvariant()
 if ($actualSha512 -ne $Candidate.isoSha512) {
     throw "ISO SHA-512 mismatch. Refusing to create qualification VMs."
@@ -205,7 +218,7 @@ catch {
 try {
     $vmSwitch = Get-VMSwitch -Name $SwitchName -ErrorAction Stop
     if ((-not $AllowNonExternalSwitch) -and ($vmSwitch.SwitchType.ToString() -ne "External")) {
-        throw "VMSwitch '$SwitchName' is '$($vmSwitch.SwitchType)'. Production qualification requires an External switch unless -AllowNonExternalSwitch is explicitly supplied."
+        throw "VMSwitch '$SwitchName' is '$($vmSwitch.SwitchType)'. LayerSentry Hyper-V qualification requires an External switch unless -AllowNonExternalSwitch is explicitly supplied."
     }
 
     $memoryBytes = [uint64]$StartupMemoryGiB * 1GB
@@ -388,7 +401,11 @@ try {
                 "ISO detached from every VM",
                 "reboot from installed OS disk",
                 "node and cluster readiness",
-                "workload or VM smoke evidence"
+                "LayerSentry branding and installer milestone UX",
+                "production-default observability add-ons",
+                "workload or VM smoke evidence",
+                "storage smoke evidence",
+                "true-air-gap evidence with public Internet blocked"
             )
         }
     }
@@ -404,10 +421,15 @@ LayerSentry Hyper-V installation qualification
 
 Candidate ISO:
   $($Candidate.isoFilename)
+  SHA-256: $($Candidate.isoSha256)
   SHA-512: $($Candidate.isoSha512)
   Bytes: $($Candidate.isoBytes)
+  Build source: $($Candidate.installerCommit)
   Build run: $($Candidate.buildWorkflowRunId)
+  Build job: $($Candidate.buildJobId)
   Artifact ID: $($Candidate.artifactId)
+  Completed lock: $($Candidate.completedLockCommit)
+  Evidence audit run: $($Candidate.evidenceAuditRunId)
 
 Prepared VMs:
   $($preparedNames -join ", ")
@@ -426,8 +448,11 @@ Required gate sequence:
   4. Detach the ISO from every virtual DVD drive.
   5. Set the installed OS disk as first boot device.
   6. Reboot and capture the installed-system console.
-  7. Verify node/cluster readiness and run workload/VM smoke tests.
-  8. Preserve evidence against the exact ISO identity above.
+  7. Verify node/cluster readiness and LayerSentry branding/installer UX.
+  8. Verify production-default observability add-ons and intended opt-in add-on behavior.
+  9. Run workload/VM and storage smoke tests.
+  10. Repeat applicable validation with public Internet blocked and approved internal DNS/NTP.
+  11. Preserve evidence against the exact ISO identity above.
 
 This preparation does not grant BOOT_SMOKE_GOOD, INSTALL_GOOD, AIRGAP_GOOD, or RELEASE_GOOD.
 "@
@@ -436,7 +461,7 @@ This preparation does not grant BOOT_SMOKE_GOOD, INSTALL_GOOD, AIRGAP_GOOD, or R
     Write-Host ""
     Write-Host "LayerSentry Hyper-V qualification VMs prepared successfully."
     Write-Host "Evidence directory: $evidenceFull"
-    Write-Host "Classification remains BUILD_GOOD; installation review is still required."
+    Write-Host "Classification remains BUILD_GOOD candidate; installation and runtime review are still required."
 }
 finally {
     if ($transcriptStarted) {
