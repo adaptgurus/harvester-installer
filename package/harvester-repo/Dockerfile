@@ -20,6 +20,6 @@ STOPSIGNAL SIGQUIT
 
 # This source-only marker intentionally retriggers the reviewed final
 # generated-image and full-offline ISO provenance workflow.
-LABEL io.layersentry.provenance-rerun="2026-09-03-locked-base-os-staging"
+LABEL io.layersentry.provenance-rerun="2026-09-03-production-observability-baseline"
 
 CMD ["nginx", "-g", "daemon off;"]
