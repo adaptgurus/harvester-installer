@@ -21,6 +21,32 @@ func TestInteractiveInstallModeOptions(t *testing.T) {
 	}
 }
 
+func TestLayerSentryProductionDefaultAddons(t *testing.T) {
+	hvstConfig := config.NewHarvesterConfig()
+	ensureLayerSentryProductionAddons(hvstConfig)
+
+	require.Equal(t, config.Addon{Enabled: true}, hvstConfig.Install.Addons["rancher_logging"])
+	require.Equal(t, config.Addon{Enabled: true}, hvstConfig.Install.Addons["rancher_monitoring"])
+	require.NotContains(t, hvstConfig.Install.Addons, "harvester_vm_import_controller")
+	require.NotContains(t, hvstConfig.Install.Addons, "harvester_pcidevices_controller")
+	require.NotContains(t, hvstConfig.Install.Addons, "harvester_seeder")
+	require.NotContains(t, hvstConfig.Install.Addons, "nvidia_driver_toolkit")
+	require.NotContains(t, hvstConfig.Install.Addons, "kubeovn_operator")
+	require.NotContains(t, hvstConfig.Install.Addons, "descheduler")
+}
+
+func TestLayerSentryProductionDefaultAddonsPreserveExplicitOverride(t *testing.T) {
+	hvstConfig := config.NewHarvesterConfig()
+	hvstConfig.Install.Addons = map[string]config.Addon{
+		"rancher_monitoring": {Enabled: false},
+	}
+
+	ensureLayerSentryProductionAddons(hvstConfig)
+
+	require.Equal(t, config.Addon{Enabled: false}, hvstConfig.Install.Addons["rancher_monitoring"])
+	require.Equal(t, config.Addon{Enabled: true}, hvstConfig.Install.Addons["rancher_logging"])
+}
+
 func TestInteractiveNetworkPanelsAreStaticOnly(t *testing.T) {
 	panels := interactiveNetworkPanels()
 	require.Contains(t, panels, askInterfacePanel)
