@@ -1,0 +1,151 @@
+name: LayerSentry v1.0 retained OS runtime baseline audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-retained-os-audit.yml
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  audit-retained-runtime-baseline:
+    name: Audit immutable retained OS and pinned base OS
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RETAINED_OS_IMAGE: ghcr.io/adaptgurus/layersentry-harvester-os@sha256:8c00bd1ee8d138d24df9fe450fbaa8063481184ccd8617b0aeda1c9b4a77fc23
+      PINNED_BASE_OS_IMAGE: docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4
+
+    steps:
+      - name: Authenticate to GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' '${{ github.token }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+      - name: Audit retained LayerSentry OS image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker pull "$RETAINED_OS_IMAGE"
+          docker image inspect "$RETAINED_OS_IMAGE" --format 'retained_repo_digests={{json .RepoDigests}}'
+
+          docker run --rm --user 0 --entrypoint /bin/sh "$RETAINED_OS_IMAGE" -ec '
+            required_commands="nc lsscsi multipath multipathd iscsiadm iscsid mount.nfs lspci lsmod modinfo dmesg"
+            for command in $required_commands; do
+              command_path="$(command -v "$command" 2>/dev/null || true)"
+              test -n "$command_path" || {
+                echo "missing required LayerSentry production host tool in retained OS: $command" >&2
+                exit 1
+              }
+              echo "retained_command[$command]=$command_path"
+            done
+
+            required_modules="qla2xxx lpfc mpt3sas megaraid_sas fnic"
+            for module in $required_modules; do
+              module_file="$(find /lib/modules -type f \( -name "$module.ko" -o -name "$module.ko.*" \) -print -quit 2>/dev/null)"
+              test -n "$module_file" || {
+                echo "missing required LayerSentry HBA/SAS module in retained OS: $module" >&2
+                exit 1
+              }
+              echo "retained_module[$module]=$module_file"
+            done
+
+            test -f /etc/systemd/system/layersentry-storage-readiness.service || {
+              echo "missing LayerSentry storage readiness service" >&2
+              exit 1
+            }
+            test -f /usr/share/layersentry/storage-capabilities.yaml || {
+              echo "missing LayerSentry storage capabilities manifest" >&2
+              exit 1
+            }
+
+            nc_path="$(command -v nc)"
+            nc_resolved="$(readlink -f "$nc_path" 2>/dev/null || printf "%s" "$nc_path")"
+            echo "retained_nc_path=$nc_path"
+            echo "retained_nc_resolved=$nc_resolved"
+
+            nc_help="$(nc -h 2>&1 || true)"
+            printf "%s\n" "$nc_help" | sed -n "1,40p"
+
+            if printf "%s\n" "$nc_help" | grep -q -- "-z" && printf "%s\n" "$nc_help" | grep -q -- "-w"; then
+              echo "retained_nc_capability=connect-scan-with-timeout"
+            elif printf "%s\n" "$nc_help" | grep -qi "busybox" && printf "%s\n" "$nc_help" | grep -q -- "-w"; then
+              echo "retained_nc_capability=busybox-connect-with-timeout"
+            else
+              echo "retained nc implementation lacks a defensible TCP reachability + timeout interface" >&2
+              exit 1
+            fi
+
+            if command -v rpm >/dev/null 2>&1; then
+              rpm -qf "$nc_resolved" 2>/dev/null || rpm -qf "$nc_path" 2>/dev/null || true
+            fi
+          '
+
+      - name: Audit pinned upstream Harvester base OS image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker pull "$PINNED_BASE_OS_IMAGE"
+          docker image inspect "$PINNED_BASE_OS_IMAGE" --format 'base_repo_digests={{json .RepoDigests}}'
+
+          docker run --rm --user 0 --entrypoint /bin/sh "$PINNED_BASE_OS_IMAGE" -ec '
+            required_commands="nc lsscsi multipath multipathd iscsiadm iscsid mount.nfs lspci lsmod modinfo dmesg"
+            for command in $required_commands; do
+              command_path="$(command -v "$command" 2>/dev/null || true)"
+              test -n "$command_path" || {
+                echo "missing required production host tool in pinned base OS: $command" >&2
+                exit 1
+              }
+              echo "base_command[$command]=$command_path"
+            done
+
+            required_modules="qla2xxx lpfc mpt3sas megaraid_sas fnic"
+            for module in $required_modules; do
+              module_file="$(find /lib/modules -type f \( -name "$module.ko" -o -name "$module.ko.*" \) -print -quit 2>/dev/null)"
+              test -n "$module_file" || {
+                echo "missing required HBA/SAS module in pinned base OS: $module" >&2
+                exit 1
+              }
+              echo "base_module[$module]=$module_file"
+            done
+
+            nc_path="$(command -v nc)"
+            nc_resolved="$(readlink -f "$nc_path" 2>/dev/null || printf "%s" "$nc_path")"
+            echo "base_nc_path=$nc_path"
+            echo "base_nc_resolved=$nc_resolved"
+
+            nc_help="$(nc -h 2>&1 || true)"
+            printf "%s\n" "$nc_help" | sed -n "1,40p"
+            if printf "%s\n" "$nc_help" | grep -q -- "-z" && printf "%s\n" "$nc_help" | grep -q -- "-w"; then
+              echo "base_nc_capability=connect-scan-with-timeout"
+            elif printf "%s\n" "$nc_help" | grep -qi "busybox" && printf "%s\n" "$nc_help" | grep -q -- "-w"; then
+              echo "base_nc_capability=busybox-connect-with-timeout"
+            else
+              echo "pinned base nc implementation lacks a defensible TCP reachability + timeout interface" >&2
+              exit 1
+            fi
+          '
+
+      - name: Record audit conclusion
+        shell: bash
+        run: |
+          {
+            echo '## LayerSentry retained OS baseline audit'
+            echo
+            echo '- Retained generated OS digest: PASS'
+            echo '- Pinned Harvester base OS digest: PASS'
+            echo '- Required production host commands: PASS'
+            echo '- Required HBA/SAS module files: PASS'
+            echo '- LayerSentry storage readiness files in retained image: PASS'
+            echo '- nc reachability/timeout interface: PASS'
+            echo
+            echo 'This workflow is evidence-only. It does not modify or rebuild the retained OS image or ISO.'
+          } >> "$GITHUB_STEP_SUMMARY"
