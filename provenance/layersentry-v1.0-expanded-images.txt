@@ -1,6 +1,6 @@
 # LayerSentry v1.0 expanded offline runtime dependencies.
 # Every alias is resolved to an immutable OCI digest before final ISO assembly.
-# dependency-lock-trigger: 2026-09-03-a
+# dependency-lock-trigger: 2026-09-03-b
 docker.io/neuvector/controller:5.5.3
 docker.io/neuvector/enforcer:5.5.3
 docker.io/neuvector/manager:5.5.3
