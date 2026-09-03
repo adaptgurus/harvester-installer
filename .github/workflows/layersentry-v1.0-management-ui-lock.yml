@@ -1,0 +1,194 @@
+name: LayerSentry v1.0 Management UI Image Lock
+
+on:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - '.github/workflows/layersentry-v1.0-management-ui-lock.yml'
+      - 'scripts/layersentry/fetch-qualified-management-ui-lock.sh'
+  workflow_dispatch:
+  schedule:
+    - cron: '23 */6 * * *'
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: layersentry-v1.0-management-ui-lock
+  cancel-in-progress: false
+
+jobs:
+  verify-lock-and-stage-offline-image:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 80
+
+    steps:
+      - name: Checkout LayerSentry installer source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: layersentry-v1.0-dev
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Resolve qualified LayerSentry management UI lock
+        shell: bash
+        env:
+          LAYERSENTRY_UI_LOCK_MAX_ATTEMPTS: '30'
+          LAYERSENTRY_UI_LOCK_SLEEP_SECONDS: '120'
+        run: |
+          chmod +x scripts/layersentry/fetch-qualified-management-ui-lock.sh
+          scripts/layersentry/fetch-qualified-management-ui-lock.sh \
+            build/locks/layersentry-management-server-v1.8.2.lock
+
+      - name: Load immutable image coordinates
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock=build/locks/layersentry-management-server-v1.8.2.lock
+
+          while IFS='=' read -r key value; do
+            case "$key" in
+              source_commit|qualification_workflow_run|immutable_image|digest_reference)
+                echo "${key}=${value}" >> "$GITHUB_OUTPUT"
+                ;;
+            esac
+          done < "$lock"
+
+      - name: Pull exact management-server image by digest
+        shell: bash
+        env:
+          DIGEST_REFERENCE: ${{ steps.lock.outputs.digest_reference }}
+          IMMUTABLE_IMAGE: ${{ steps.lock.outputs.immutable_image }}
+        run: |
+          set -euo pipefail
+          docker pull "$DIGEST_REFERENCE"
+          docker tag "$DIGEST_REFERENCE" "$IMMUTABLE_IMAGE"
+
+      - name: Verify LayerSentry UI metadata inside image
+        shell: bash
+        env:
+          IMAGE: ${{ steps.lock.outputs.immutable_image }}
+          EXPECTED_SHA: ${{ steps.lock.outputs.source_commit }}
+          EXPECTED_RUN: ${{ steps.lock.outputs.qualification_workflow_run }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/layersentry-management-ui
+          container_id="$(docker create "$IMAGE")"
+          trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
+
+          docker cp "$container_id:/usr/share/harvester/harvester" /tmp/layersentry-management-ui
+          test -s /tmp/layersentry-management-ui/index.html
+          test -s /tmp/layersentry-management-ui/layersentry-ui-build.json
+          grep -R -a -m 1 'LayerSentry' /tmp/layersentry-management-ui
+          grep -R -a -m 1 'layersentry-operations-dashboard' /tmp/layersentry-management-ui
+          grep -F "\"sourceCommit\": \"${EXPECTED_SHA}\"" \
+            /tmp/layersentry-management-ui/layersentry-ui-build.json
+          grep -F "\"qualificationWorkflowRun\": \"${EXPECTED_RUN}\"" \
+            /tmp/layersentry-management-ui/layersentry-ui-build.json
+
+      - name: Generate installer image lock and chart override
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.lock.outputs.source_commit }}
+          QUALIFICATION_RUN: ${{ steps.lock.outputs.qualification_workflow_run }}
+          IMMUTABLE_IMAGE: ${{ steps.lock.outputs.immutable_image }}
+          DIGEST_REFERENCE: ${{ steps.lock.outputs.digest_reference }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/locks build/values build/image-lists docs/build-evidence
+
+          repository="${IMMUTABLE_IMAGE%%:*}"
+          tag="${IMMUTABLE_IMAGE##*:}"
+
+          cat > build/locks/layersentry-management-server-v1.8.2.lock.json <<EOF
+          {
+            "schemaVersion": "1.0",
+            "product": "LayerSentry",
+            "component": "management-server-ui",
+            "compatibilityBase": "rancher/harvester:v1.8.2",
+            "sourceRepository": "adaptgurus/harvester-ui-extension",
+            "sourceCommit": "${SOURCE_SHA}",
+            "qualificationWorkflowRun": "${QUALIFICATION_RUN}",
+            "image": "${IMMUTABLE_IMAGE}",
+            "digestReference": "${DIGEST_REFERENCE}",
+            "dashboardMarker": "layersentry-operations-dashboard"
+          }
+          EOF
+
+          cat > build/values/layersentry-management-server-image.yaml <<EOF
+          image:
+            repository: ${repository}
+            tag: ${tag}
+            pullPolicy: IfNotPresent
+          EOF
+
+          printf '%s\n' "$DIGEST_REFERENCE" > \
+            build/image-lists/layersentry-management-server-v1.8.2.txt
+
+          cat > docs/build-evidence/layersentry-management-ui-lock.md <<EOF
+          # LayerSentry management UI lock
+
+          - UI source commit: ${SOURCE_SHA}
+          - Qualification workflow run: ${QUALIFICATION_RUN}
+          - Immutable image: ${IMMUTABLE_IMAGE}
+          - Digest reference: ${DIGEST_REFERENCE}
+          - Compatibility base: rancher/harvester:v1.8.2
+
+          The pinned image was pulled by digest and inspected for the LayerSentry
+          browser product name, the advanced Operations Control Plane marker, and
+          exact source/qualification metadata before this lock was written.
+
+          Files for downstream ISO composition:
+
+          - build/locks/layersentry-management-server-v1.8.2.lock.json
+          - build/values/layersentry-management-server-image.yaml
+          - build/image-lists/layersentry-management-server-v1.8.2.txt
+          EOF
+
+      - name: Export exact image for offline composition
+        shell: bash
+        env:
+          IMAGE: ${{ steps.lock.outputs.immutable_image }}
+        run: |
+          set -euo pipefail
+          mkdir -p offline-image
+          docker save "$IMAGE" | gzip -9 > \
+            offline-image/layersentry-management-server-v1.8.2-docker.tar.gz
+          test -s offline-image/layersentry-management-server-v1.8.2-docker.tar.gz
+          sha256sum offline-image/layersentry-management-server-v1.8.2-docker.tar.gz > \
+            offline-image/SHA256SUMS
+
+      - name: Commit immutable installer lock
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.lock.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            build/locks/layersentry-management-server-v1.8.2.lock \
+            build/locks/layersentry-management-server-v1.8.2.lock.json \
+            build/values/layersentry-management-server-image.yaml \
+            build/image-lists/layersentry-management-server-v1.8.2.txt \
+            docs/build-evidence/layersentry-management-ui-lock.md
+
+          if git diff --cached --quiet; then
+            echo 'Installer management UI lock is already current.'
+            exit 0
+          fi
+
+          git commit -m "build(layersentry): lock qualified management UI ${SOURCE_SHA}"
+          git push origin HEAD:layersentry-v1.0-dev
+
+      - name: Upload offline management UI image
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-management-server-v1.8.2-offline-${{ steps.lock.outputs.source_commit }}
+          path: offline-image/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
