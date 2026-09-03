@@ -1,0 +1,251 @@
+name: LayerSentry v1.0 completed evidence audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry-v1.0-dev
+    paths:
+      - .github/workflows/layersentry-v1.0-completed-evidence-audit.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    name: Rebind completed lock to uploaded candidate artifacts
+    if: github.ref_name == 'layersentry-v1.0-dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      LOCK_FILE: provenance/layersentry-v1.0-harvester-v1.8.2.lock.json
+      OUT_DIR: layersentry-evidence-audit
+    steps:
+      - name: Checkout audited branch state
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve reviewed build identity
+        id: reviewed
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$OUT_DIR"
+          python3 - "$LOCK_FILE" "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          lock = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if lock.get("lock_status") != "complete" or lock.get("unresolved") != []:
+              raise SystemExit("completed evidence audit requires a complete lock with no unresolved dependencies")
+          reviewed = lock.get("reviewed_offline_image_set")
+          if not isinstance(reviewed, dict) or reviewed.get("dependency_lock_complete") is not True:
+              raise SystemExit("reviewed offline image-set completion metadata is missing")
+          source = str(reviewed.get("build_source_commit", ""))
+          run_id = reviewed.get("build_run_id")
+          iso = reviewed.get("iso_candidate") or {}
+          if not re.fullmatch(r"[0-9a-f]{40}", source):
+              raise SystemExit("reviewed build source commit is invalid")
+          if not isinstance(run_id, int) or run_id <= 0:
+              raise SystemExit("reviewed build run id is invalid")
+          if not re.fullmatch(r"[0-9a-f]{64}", str(iso.get("sha256", ""))):
+              raise SystemExit("reviewed ISO SHA-256 is invalid")
+          if not re.fullmatch(r"[0-9a-f]{128}", str(iso.get("sha512", ""))):
+              raise SystemExit("reviewed ISO SHA-512 is invalid")
+          with Path(sys.argv[2]).open("a", encoding="utf-8") as output:
+              output.write(f"source_commit={source}\n")
+              output.write(f"build_run_id={run_id}\n")
+          PY
+
+      - name: Resolve exact successful-run artifact metadata
+        id: artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_SOURCE_COMMIT: ${{ steps.reviewed.outputs.source_commit }}
+          BUILD_RUN_ID: ${{ steps.reviewed.outputs.build_run_id }}
+        run: |
+          set -Eeuo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${BUILD_RUN_ID}/artifacts?per_page=100" \
+            > "$OUT_DIR/run-artifacts.json"
+          python3 - "$OUT_DIR/run-artifacts.json" "$BUILD_SOURCE_COMMIT" "$BUILD_RUN_ID" "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          source = sys.argv[2]
+          run_id = sys.argv[3]
+          evidence_name = f"layersentry-v1.0-complete-build-evidence-{source}-{run_id}"
+          iso_name = f"layersentry-v1.0-harvester-v1.8.2-amd64-offline-{source}"
+          by_name = {item.get("name"): item for item in payload.get("artifacts", [])}
+          evidence = by_name.get(evidence_name)
+          iso = by_name.get(iso_name)
+          if not isinstance(evidence, dict) or not isinstance(iso, dict):
+              raise SystemExit("exact reviewed evidence/ISO artifacts are not both present")
+          for label, item in (("evidence", evidence), ("iso", iso)):
+              if item.get("expired") is not False:
+                  raise SystemExit(f"{label} artifact is expired")
+              digest = str(item.get("digest", ""))
+              if not digest.startswith("sha256:") or len(digest) != 71:
+                  raise SystemExit(f"{label} artifact digest is missing or invalid")
+              size = item.get("size_in_bytes")
+              if not isinstance(size, int) or size <= 0:
+                  raise SystemExit(f"{label} artifact size is invalid")
+          with Path(sys.argv[4]).open("a", encoding="utf-8") as output:
+              output.write(f"evidence_name={evidence_name}\n")
+              output.write(f"evidence_id={evidence['id']}\n")
+              output.write(f"iso_name={iso_name}\n")
+              output.write(f"iso_id={iso['id']}\n")
+          PY
+
+      - name: Download small evidence artifact and perform completed-state audit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ steps.reviewed.outputs.build_run_id }}
+          EVIDENCE_NAME: ${{ steps.artifacts.outputs.evidence_name }}
+          ISO_ARTIFACT_NAME: ${{ steps.artifacts.outputs.iso_name }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$OUT_DIR/downloaded"
+          gh run download "$BUILD_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$EVIDENCE_NAME" \
+            --dir "$OUT_DIR/downloaded"
+
+          python3 - "$LOCK_FILE" "$OUT_DIR" "$ISO_ARTIFACT_NAME" <<'PY'
+          import hashlib
+          import json
+          import shutil
+          import sys
+          from pathlib import Path
+
+          lock_path = Path(sys.argv[1])
+          out = Path(sys.argv[2])
+          iso_artifact_name = sys.argv[3]
+          downloaded = out / "downloaded"
+          lock = json.loads(lock_path.read_text(encoding="utf-8"))
+          reviewed = lock["reviewed_offline_image_set"]
+
+          def exactly_one(name: str) -> Path:
+              matches = list(downloaded.rglob(name))
+              if len(matches) != 1:
+                  raise SystemExit(f"expected exactly one {name}, found {len(matches)}")
+              return matches[0]
+
+          iso_metadata_path = exactly_one("iso-metadata.json")
+          review_path = exactly_one("review-applied.json")
+          coverage_path = exactly_one("image-digest-coverage-report.json")
+          binding_path = exactly_one("offline-image-set-binding-report.json")
+          completed_path = exactly_one("completed-provenance-report.json")
+          candidate_status_path = exactly_one("STATUS.md")
+
+          iso_metadata = json.loads(iso_metadata_path.read_text(encoding="utf-8"))
+          review = json.loads(review_path.read_text(encoding="utf-8"))
+          coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
+          binding = json.loads(binding_path.read_text(encoding="utf-8"))
+          completed = json.loads(completed_path.read_text(encoding="utf-8"))
+          artifact_payload = json.loads((out / "run-artifacts.json").read_text(encoding="utf-8"))
+          artifact_by_name = {item.get("name"): item for item in artifact_payload.get("artifacts", [])}
+          iso_artifact = artifact_by_name[iso_artifact_name]
+
+          expected_iso = reviewed["iso_candidate"]
+          for field in ("sha256", "sha512", "bytes"):
+              if iso_metadata.get(field) != expected_iso.get(field):
+                  raise SystemExit(f"ISO {field} differs between candidate evidence and completed lock")
+          if review.get("applied") is not True or review.get("dependency_lock_complete") is not True:
+              raise SystemExit("offline image-set review was not applied as a completed lock")
+          if review.get("remaining_unresolved_count") != 0 or review.get("remaining_unresolved_ids") != []:
+              raise SystemExit("offline image-set review still reports unresolved dependencies")
+          if binding.get("verified") is not True or binding.get("error_count") != 0 or binding.get("errors") != []:
+              raise SystemExit("offline image-set binding verification failed")
+          if coverage.get("eligible") is not True or coverage.get("errors") != []:
+              raise SystemExit("image digest coverage is not eligible")
+          if completed.get("lock_status") != "complete" or completed.get("errors") != []:
+              raise SystemExit("completed provenance report is not clean")
+          if lock.get("lock_status") != "complete" or lock.get("unresolved") != []:
+              raise SystemExit("repository lock is not complete")
+
+          candidate_status = candidate_status_path.read_text(encoding="utf-8")
+          if "Dependency lock complete: **false**" not in candidate_status:
+              raise SystemExit("candidate-stage STATUS.md no longer has the expected pre-review state")
+
+          final = {
+              "schema": "layersentry.completed-evidence-audit/v1",
+              "classification": "BUILD_GOOD_CANDIDATE",
+              "build_source_commit": reviewed["build_source_commit"],
+              "build_run_id": reviewed["build_run_id"],
+              "dependency_lock_complete": True,
+              "remaining_unresolved_count": 0,
+              "generated_image_count": len(reviewed.get("images") or []),
+              "observed_runtime_alias_count": reviewed.get("image_lists", {}).get("observed_alias_count"),
+              "iso": {
+                  "filename": "layersentry-v1.0-harvester-v1.8.2-amd64.iso",
+                  "bytes": expected_iso["bytes"],
+                  "sha256": expected_iso["sha256"],
+                  "sha512": expected_iso["sha512"],
+                  "artifact_name": iso_artifact_name,
+                  "artifact_id": iso_artifact["id"],
+                  "artifact_archive_bytes": iso_artifact["size_in_bytes"],
+                  "artifact_archive_digest": iso_artifact["digest"],
+              },
+              "binding_verified": True,
+              "image_coverage_eligible": True,
+              "candidate_status_semantics": "pre-review evidence; dependency_lock_complete=false is expected at that stage",
+              "installation_qualified": False,
+              "runtime_qualified": False,
+              "airgap_qualified": False,
+              "release_approved": False,
+          }
+          (out / "final-status.json").write_text(json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          (out / "FINAL-STATUS.md").write_text(
+              "# LayerSentry v1.0 completed evidence audit\n\n"
+              f"- Classification: **BUILD-GOOD candidate**\n"
+              f"- Build source commit: `{final['build_source_commit']}`\n"
+              f"- Build run: `{final['build_run_id']}`\n"
+              f"- Dependency lock complete: **true**\n"
+              f"- Remaining unresolved dependencies: **0**\n"
+              f"- ISO bytes: `{final['iso']['bytes']}`\n"
+              f"- ISO SHA-256: `{final['iso']['sha256']}`\n"
+              f"- ISO SHA-512: `{final['iso']['sha512']}`\n"
+              f"- ISO artifact ID: `{final['iso']['artifact_id']}`\n"
+              f"- Binding verified: **true**\n"
+              f"- Image coverage eligible: **true**\n"
+              "- Candidate-stage `STATUS.md` is preserved as pre-review evidence; its `dependency lock complete: false` line is expected for that earlier phase.\n"
+              "- Installation qualified: **false**\n"
+              "- Runtime qualified: **false**\n"
+              "- Air-gap qualified: **false**\n"
+              "- Release approved: **false**\n",
+              encoding="utf-8",
+          )
+          shutil.copy2(lock_path, out / "completed-provenance-lock.json")
+          for path in (iso_metadata_path, review_path, coverage_path, binding_path, completed_path, candidate_status_path):
+              shutil.copy2(path, out / path.name)
+
+          manifest_lines = []
+          for path in sorted(p for p in out.iterdir() if p.is_file() and p.name != "manifest.sha256"):
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              manifest_lines.append(f"{digest}  {path.name}")
+          (out / "manifest.sha256").write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
+          print("LAYERSENTRY COMPLETED EVIDENCE AUDIT: PASS")
+          PY
+
+          rm -rf "$OUT_DIR/downloaded"
+          sha256sum -c "$OUT_DIR/manifest.sha256" --ignore-missing
+          cat "$OUT_DIR/FINAL-STATUS.md"
+
+      - name: Upload completed evidence audit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layersentry-v1.0-completed-evidence-audit-${{ steps.reviewed.outputs.source_commit }}-${{ steps.reviewed.outputs.build_run_id }}
+          path: layersentry-evidence-audit/**
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
