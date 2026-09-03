@@ -19,8 +19,12 @@ COPY files/ /
 RUN chmod 0600 /system/oem/* \
     && chmod 0755 /usr/local/sbin/layersentry-branding.sh \
                   /usr/local/sbin/layersentry-storage-readiness.sh \
-    && for command in multipath multipathd iscsiadm iscsid mount.nfs; do \
-         command -v "$command" >/dev/null 2>&1 || { echo "missing required LayerSentry storage tool: $command" >&2; exit 1; }; \
+    && for command in nc lsscsi multipath multipathd iscsiadm iscsid mount.nfs lspci lsmod modinfo dmesg; do \
+         command -v "$command" >/dev/null 2>&1 || { echo "missing required LayerSentry production host tool: $command" >&2; exit 1; }; \
+       done \
+    && for module in qla2xxx lpfc mpt3sas megaraid_sas fnic; do \
+         module_file="$(find /lib/modules -type f \( -name "$module.ko" -o -name "$module.ko.*" \) -print -quit 2>/dev/null)"; \
+         test -n "$module_file" || { echo "missing required LayerSentry HBA/SAS module: $module" >&2; exit 1; }; \
        done \
     && test -f /etc/systemd/system/layersentry-storage-readiness.service \
     && test -f /usr/share/layersentry/storage-capabilities.yaml
