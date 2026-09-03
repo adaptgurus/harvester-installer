@@ -15,13 +15,31 @@ permissions:
 jobs:
   audit-retained-runtime-baseline:
     name: Audit immutable retained OS and pinned base OS
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       RETAINED_OS_IMAGE: ghcr.io/adaptgurus/layersentry-harvester-os@sha256:8c00bd1ee8d138d24df9fe450fbaa8063481184ccd8617b0aeda1c9b4a77fc23
       PINNED_BASE_OS_IMAGE: docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4
 
     steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fast provenance gate before network work
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/provenance/verify_lock.py \
+            provenance/layersentry-v1.0-harvester-v1.8.2.lock.json \
+            --require-complete \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --scan-build-inputs \
+            --report retained-os-audit-provenance.json
+
       - name: Authenticate to GHCR
         shell: bash
         run: |
