@@ -15,6 +15,26 @@ import (
 
 const vipNeighborProbeTimeout = 1500 * time.Millisecond
 
+var layerSentryProductionDefaultAddons = []string{
+	"rancher_logging",
+	"rancher_monitoring",
+}
+
+// ensureLayerSentryProductionAddons applies the stable LayerSentry production
+// observability baseline without overriding any explicit installer choice.
+// Experimental and hardware-specific add-ons remain bundled but opt-in.
+func ensureLayerSentryProductionAddons(hvstConfig *config.HarvesterConfig) {
+	if hvstConfig.Install.Addons == nil {
+		hvstConfig.Install.Addons = make(map[string]config.Addon)
+	}
+	for _, name := range layerSentryProductionDefaultAddons {
+		if _, explicitlyConfigured := hvstConfig.Install.Addons[name]; explicitlyConfigured {
+			continue
+		}
+		hvstConfig.Install.Addons[name] = config.Addon{Enabled: true}
+	}
+}
+
 func interactiveInstallModeOptions() ([]widgets.Option, error) {
 	return []widgets.Option{
 		{Value: config.ModeCreate, Text: fmt.Sprintf("Create a new %s cluster", version.ProductName)},
