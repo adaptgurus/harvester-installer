@@ -1,6 +1,20 @@
 {
   "charts": [
     {
+      "archive": "descheduler-0.33.0.tgz",
+      "bytes": 8686,
+      "id": "descheduler",
+      "name": "descheduler",
+      "sha256": "250ff86d4435e5192f10f532636e433bb78990627a9a2ad6f20adf44c0a345b2",
+      "source": "https://github.com/kubernetes-sigs/descheduler/releases/download/descheduler-helm-chart-0.33.0/descheduler-0.33.0.tgz",
+      "source_bytes": 8973,
+      "source_sha256": "1f32da32dedc6c066f197637e1fbd10546e9c6987322b88e71add1c9765c978f",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "0.33.0"
+    },
+    {
       "archive": "harvester-1.8.2.tgz",
       "bytes": 211226,
       "id": "harvester",
@@ -22,79 +36,6 @@
       "source": "git+https://github.com/harvester/harvester.git@5320dfa6770f63406750e7c64b24ed87c543e6ad#deploy/charts/harvester-crd",
       "transformations": [
         "scripts/patch-harvester",
-        "deterministic-archive-normalization"
-      ],
-      "version": "1.8.2"
-    },
-    {
-      "archive": "rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
-      "bytes": 186531,
-      "id": "rancher-monitoring-crd",
-      "name": "rancher-monitoring-crd",
-      "sha256": "96f88c8cb3f2f88cfd0e4bf49c19999168cebac293d86b64a9adfdc8c42d6045",
-      "source": "https://charts.rancher.io/assets/rancher-monitoring-crd/rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
-      "source_bytes": 186349,
-      "source_sha256": "8af022dc9c86a4582d4fbe8a4aa36e8dd2844d05fb203eafdf6ea34d6459f5b7",
-      "transformations": [
-        "addons:patch-rancher-monitoring-crd",
-        "deterministic-archive-normalization"
-      ],
-      "version": "108.0.2+up77.9.1-rancher.11"
-    },
-    {
-      "archive": "rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
-      "bytes": 457882,
-      "id": "rancher-monitoring",
-      "name": "rancher-monitoring",
-      "sha256": "0eef71f9c744173af0e627e63f89026b2ae2c6abb799def96faf1c32e02a0bee",
-      "source": "https://charts.rancher.io/assets/rancher-monitoring/rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
-      "source_bytes": 464293,
-      "source_sha256": "f8efb9e3ee01dee73c389c3893cf4dc4716065f6bb413e4fab7f7cfffd29bbe3",
-      "transformations": [
-        "addons:patch-rancher-monitoring",
-        "deterministic-archive-normalization"
-      ],
-      "version": "108.0.2+up77.9.1-rancher.11"
-    },
-    {
-      "archive": "rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
-      "bytes": 163347,
-      "id": "rancher-logging-crd",
-      "name": "rancher-logging-crd",
-      "sha256": "456b6683e85e7272e4cae9c32ec903bbd0f8654bfab4a44841e7470634a090b9",
-      "source": "https://charts.rancher.io/assets/rancher-logging-crd/rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
-      "source_bytes": 175027,
-      "source_sha256": "df6be1b90c1ec4bf832d49bd4095819d5678a95411ddcf643004c714e6c8efae",
-      "transformations": [
-        "deterministic-archive-normalization"
-      ],
-      "version": "108.0.2+up4.10.0-rancher.18"
-    },
-    {
-      "archive": "rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
-      "bytes": 19175,
-      "id": "rancher-logging",
-      "name": "rancher-logging",
-      "sha256": "da3a897f8c345cc7a1a7931ea8e4ea10e7cef2656d1dd56dacbd9299dfd0077f",
-      "source": "https://charts.rancher.io/assets/rancher-logging/rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
-      "source_bytes": 19302,
-      "source_sha256": "0321c132aadd1c2ef9b6e5b0fd0d0e92186d0d0b92ba5bbc7e24eb7b11ac41fb",
-      "transformations": [
-        "addons:patch-rancher-logging",
-        "deterministic-archive-normalization"
-      ],
-      "version": "108.0.2+up4.10.0-rancher.18"
-    },
-    {
-      "archive": "harvester-vm-import-controller-1.8.2.tgz",
-      "bytes": 2672,
-      "id": "harvester-vm-import-controller",
-      "name": "harvester-vm-import-controller",
-      "sha256": "63055cb221f3ca27efdb23609be3936c205c38ddb56d9159c8036c59769a2cef",
-      "source": "https://github.com/harvester/charts/releases/download/harvester-vm-import-controller-1.8.2/harvester-vm-import-controller-1.8.2.tgz",
-      "source_bytes": 2722,
-      "source_sha256": "63e34f9d08e6994e43db3406091e37c89d089b3845839e23d8c99c2690fb8d7f",
-      "transformations": [
         "deterministic-archive-normalization"
       ],
       "version": "1.8.2"
@@ -128,32 +69,18 @@
       "version": "1.8.2"
     },
     {
-      "archive": "nvidia-driver-runtime-1.8.2.tgz",
-      "bytes": 2748,
-      "id": "nvidia-driver-runtime",
-      "name": "nvidia-driver-runtime",
-      "sha256": "af0a6269713accae25602e9a26c5eada0840d61dff43d822e24ceb05a1e600ac",
-      "source": "https://github.com/harvester/charts/releases/download/nvidia-driver-runtime-1.8.2/nvidia-driver-runtime-1.8.2.tgz",
-      "source_bytes": 2765,
-      "source_sha256": "106a082f1571774e91b26a6ce75d2517e9890478d79ae957a00710d9d87abb01",
+      "archive": "harvester-vm-import-controller-1.8.2.tgz",
+      "bytes": 2672,
+      "id": "harvester-vm-import-controller",
+      "name": "harvester-vm-import-controller",
+      "sha256": "63055cb221f3ca27efdb23609be3936c205c38ddb56d9159c8036c59769a2cef",
+      "source": "https://github.com/harvester/charts/releases/download/harvester-vm-import-controller-1.8.2/harvester-vm-import-controller-1.8.2.tgz",
+      "source_bytes": 2722,
+      "source_sha256": "63e34f9d08e6994e43db3406091e37c89d089b3845839e23d8c99c2690fb8d7f",
       "transformations": [
         "deterministic-archive-normalization"
       ],
       "version": "1.8.2"
-    },
-    {
-      "archive": "kubeovn-operator-crd-1.15.4-r2.tgz",
-      "bytes": 4187,
-      "id": "kubeovn-operator-crd",
-      "name": "kubeovn-operator-crd",
-      "sha256": "90e0d9b7f208d23e97d56b7faeb8b2fe1045dd3975aae46b98755a88f51b77cd",
-      "source": "https://github.com/harvester/charts/releases/download/kubeovn-operator-crd-1.15.4-r2/kubeovn-operator-crd-1.15.4-r2.tgz",
-      "source_bytes": 4327,
-      "source_sha256": "8efcfdd3fde5fd17e6fc80e951f5e7b03243fcc517cdde52bbf0ef8f5b32475d",
-      "transformations": [
-        "deterministic-archive-normalization"
-      ],
-      "version": "1.15.4-r2"
     },
     {
       "archive": "kubeovn-operator-1.15.4-r2.tgz",
@@ -170,18 +97,130 @@
       "version": "1.15.4-r2"
     },
     {
-      "archive": "descheduler-0.33.0.tgz",
-      "bytes": 8686,
-      "id": "descheduler",
-      "name": "descheduler",
-      "sha256": "250ff86d4435e5192f10f532636e433bb78990627a9a2ad6f20adf44c0a345b2",
-      "source": "https://github.com/kubernetes-sigs/descheduler/releases/download/descheduler-helm-chart-0.33.0/descheduler-0.33.0.tgz",
-      "source_bytes": 8973,
-      "source_sha256": "1f32da32dedc6c066f197637e1fbd10546e9c6987322b88e71add1c9765c978f",
+      "archive": "kubeovn-operator-crd-1.15.4-r2.tgz",
+      "bytes": 4187,
+      "id": "kubeovn-operator-crd",
+      "name": "kubeovn-operator-crd",
+      "sha256": "90e0d9b7f208d23e97d56b7faeb8b2fe1045dd3975aae46b98755a88f51b77cd",
+      "source": "https://github.com/harvester/charts/releases/download/kubeovn-operator-crd-1.15.4-r2/kubeovn-operator-crd-1.15.4-r2.tgz",
+      "source_bytes": 4327,
+      "source_sha256": "8efcfdd3fde5fd17e6fc80e951f5e7b03243fcc517cdde52bbf0ef8f5b32475d",
       "transformations": [
         "deterministic-archive-normalization"
       ],
-      "version": "0.33.0"
+      "version": "1.15.4-r2"
+    },
+    {
+      "archive": "csi-driver-nfs-4.12.0.tgz",
+      "bytes": 11788,
+      "id": "layersentry-csi-nfs",
+      "name": "csi-driver-nfs",
+      "sha256": "139038e38654307e3ae792cf298da9af1e8602c81935230f003b6e526c7cf02a",
+      "source": "https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/57ba72f46ca0864b16e9523ee71e88878c0a5c48/charts/v4.12.0/csi-driver-nfs-4.12.0.tgz",
+      "source_bytes": 12069,
+      "source_sha256": "2d02ab3bc3bf6b49537f83e04180fe8e434bb126a4c402b0d54caa2610a475d1",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "4.12.0"
+    },
+    {
+      "archive": "core-2.10.3.tgz",
+      "bytes": 34580,
+      "id": "layersentry-runtime-security",
+      "name": "core",
+      "sha256": "32a9123d77e5c8a5a3e5ef88b9d0aeb27b713cb8aa2e5e00fa9ecce62edcd895",
+      "source": "git+https://github.com/neuvector/neuvector-helm.git@501b8f0e5213f2d1f4e1f904892fe86f7fb7e45b#charts/core",
+      "transformations": [
+        "scripts/layersentry/prepare-runtime-security-chart.py",
+        "deterministic-archive-normalization"
+      ],
+      "version": "2.10.3"
+    },
+    {
+      "archive": "crd-2.10.3.tgz",
+      "bytes": 3879,
+      "id": "layersentry-runtime-security-crd",
+      "name": "crd",
+      "sha256": "76eec94aac107b73eaab37ceac003eb0282bdbe348301140a78680b7c8b7789a",
+      "source": "git+https://github.com/neuvector/neuvector-helm.git@501b8f0e5213f2d1f4e1f904892fe86f7fb7e45b#charts/crd",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "2.10.3"
+    },
+    {
+      "archive": "nvidia-driver-runtime-1.8.2.tgz",
+      "bytes": 2748,
+      "id": "nvidia-driver-runtime",
+      "name": "nvidia-driver-runtime",
+      "sha256": "af0a6269713accae25602e9a26c5eada0840d61dff43d822e24ceb05a1e600ac",
+      "source": "https://github.com/harvester/charts/releases/download/nvidia-driver-runtime-1.8.2/nvidia-driver-runtime-1.8.2.tgz",
+      "source_bytes": 2765,
+      "source_sha256": "106a082f1571774e91b26a6ce75d2517e9890478d79ae957a00710d9d87abb01",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "1.8.2"
+    },
+    {
+      "archive": "rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
+      "bytes": 19175,
+      "id": "rancher-logging",
+      "name": "rancher-logging",
+      "sha256": "da3a897f8c345cc7a1a7931ea8e4ea10e7cef2656d1dd56dacbd9299dfd0077f",
+      "source": "https://charts.rancher.io/assets/rancher-logging/rancher-logging-108.0.2+up4.10.0-rancher.18.tgz",
+      "source_bytes": 19302,
+      "source_sha256": "0321c132aadd1c2ef9b6e5b0fd0d0e92186d0d0b92ba5bbc7e24eb7b11ac41fb",
+      "transformations": [
+        "addons:patch-rancher-logging",
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up4.10.0-rancher.18"
+    },
+    {
+      "archive": "rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
+      "bytes": 163347,
+      "id": "rancher-logging-crd",
+      "name": "rancher-logging-crd",
+      "sha256": "456b6683e85e7272e4cae9c32ec903bbd0f8654bfab4a44841e7470634a090b9",
+      "source": "https://charts.rancher.io/assets/rancher-logging-crd/rancher-logging-crd-108.0.2+up4.10.0-rancher.18.tgz",
+      "source_bytes": 175027,
+      "source_sha256": "df6be1b90c1ec4bf832d49bd4095819d5678a95411ddcf643004c714e6c8efae",
+      "transformations": [
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up4.10.0-rancher.18"
+    },
+    {
+      "archive": "rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
+      "bytes": 457882,
+      "id": "rancher-monitoring",
+      "name": "rancher-monitoring",
+      "sha256": "0eef71f9c744173af0e627e63f89026b2ae2c6abb799def96faf1c32e02a0bee",
+      "source": "https://charts.rancher.io/assets/rancher-monitoring/rancher-monitoring-108.0.2+up77.9.1-rancher.11.tgz",
+      "source_bytes": 464293,
+      "source_sha256": "f8efb9e3ee01dee73c389c3893cf4dc4716065f6bb413e4fab7f7cfffd29bbe3",
+      "transformations": [
+        "addons:patch-rancher-monitoring",
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up77.9.1-rancher.11"
+    },
+    {
+      "archive": "rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
+      "bytes": 186531,
+      "id": "rancher-monitoring-crd",
+      "name": "rancher-monitoring-crd",
+      "sha256": "96f88c8cb3f2f88cfd0e4bf49c19999168cebac293d86b64a9adfdc8c42d6045",
+      "source": "https://charts.rancher.io/assets/rancher-monitoring-crd/rancher-monitoring-crd-108.0.2+up77.9.1-rancher.11.tgz",
+      "source_bytes": 186349,
+      "source_sha256": "8af022dc9c86a4582d4fbe8a4aa36e8dd2844d05fb203eafdf6ea34d6459f5b7",
+      "transformations": [
+        "addons:patch-rancher-monitoring-crd",
+        "deterministic-archive-normalization"
+      ],
+      "version": "108.0.2+up77.9.1-rancher.11"
     }
   ],
   "ci_actions": [
@@ -318,6 +357,34 @@
       ],
       "id": "docker-io-longhornio-support-bundle-kit",
       "ref": "docker.io/longhornio/support-bundle-kit@sha256:cf2a89ed18a73e32b3fe657aefb8f819a1c6734df888821b3dff056b360fe222"
+    },
+    {
+      "aliases": [
+        "docker.io/neuvector/controller:5.5.3"
+      ],
+      "id": "docker-io-neuvector-controller",
+      "ref": "docker.io/neuvector/controller@sha256:6ad7c11a5678670b052fbae401c9816d9aeccd882ff0af730a1065c6d2e8d2e2"
+    },
+    {
+      "aliases": [
+        "docker.io/neuvector/enforcer:5.5.3"
+      ],
+      "id": "docker-io-neuvector-enforcer",
+      "ref": "docker.io/neuvector/enforcer@sha256:41c6ae02bdb5ebffd20c54facfef31ae900269d2613ee54113e82cb36eee562e"
+    },
+    {
+      "aliases": [
+        "docker.io/neuvector/manager:5.5.3"
+      ],
+      "id": "docker-io-neuvector-manager",
+      "ref": "docker.io/neuvector/manager@sha256:d207dbe604c3bc7b970901d483995804dccd42c2a377d0919cc2779e2fbfd456"
+    },
+    {
+      "aliases": [
+        "docker.io/neuvector/scanner:6"
+      ],
+      "id": "docker-io-neuvector-scanner",
+      "ref": "docker.io/neuvector/scanner@sha256:fd2d6b33eea15bfd1d9a7f9299ac0db31fb75962789e41d6967e5ee45f3c5519"
     },
     {
       "aliases": [
@@ -910,6 +977,48 @@
     },
     {
       "aliases": [
+        "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-node-driver-registrar",
+      "ref": "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:11f199f6bec47403b03cb49c79a41f445884b213b382582a60710b8c6fdc316a"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/csi-provisioner:v5.3.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-provisioner",
+      "ref": "registry.k8s.io/sig-storage/csi-provisioner@sha256:bb057f866177d5f4139a1527e594499cbe0feeb67b63aaca8679dfdf0a6016f9"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/csi-resizer:v1.14.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-resizer",
+      "ref": "registry.k8s.io/sig-storage/csi-resizer@sha256:5e7cbb63fd497fa913caa21fee1a69f727c220c6fa83c5f8bb0995e2ad73a474"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-snapshotter",
+      "ref": "registry.k8s.io/sig-storage/csi-snapshotter@sha256:bc7be893ecc3ad524194aa6573b2f5c06cd469bdf21a500ab6c99c2ba1c4d64d"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/livenessprobe:v2.17.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-livenessprobe",
+      "ref": "registry.k8s.io/sig-storage/livenessprobe@sha256:9b75b9ade162136291d5e8f13a1dfc3dec71ee61419b1bfc112e0796ff8a6aa9"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/nfsplugin:v4.12.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-nfsplugin",
+      "ref": "registry.k8s.io/sig-storage/nfsplugin@sha256:01cf7d10a9fbd7ce4188d5f15340f3619ef29b504418b306fff9f24792aac6d1"
+    },
+    {
+      "aliases": [
         "registry.k8s.io/sig-storage/snapshot-controller:v8.5.0"
       ],
       "id": "registry-k8s-io-sig-storage-snapshot-controller",
@@ -1278,6 +1387,42 @@
     "source_commit": "4d144ceaa429d66afdfed43ed5988d53f9e6f76c",
     "status": "external-inputs-reviewed-lock-still-incomplete"
   },
+  "reviewed_expanded_dependencies": {
+    "chart_ids": [
+      "layersentry-csi-nfs",
+      "layersentry-runtime-security",
+      "layersentry-runtime-security-crd"
+    ],
+    "chart_source_date_epoch": 1788410944,
+    "image_aliases": [
+      "docker.io/neuvector/controller:5.5.3",
+      "docker.io/neuvector/enforcer:5.5.3",
+      "docker.io/neuvector/manager:5.5.3",
+      "docker.io/neuvector/scanner:6",
+      "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0",
+      "registry.k8s.io/sig-storage/csi-provisioner:v5.3.0",
+      "registry.k8s.io/sig-storage/csi-resizer:v1.14.0",
+      "registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0",
+      "registry.k8s.io/sig-storage/livenessprobe:v2.17.0",
+      "registry.k8s.io/sig-storage/nfsplugin:v4.12.0"
+    ],
+    "new_image_refs": 10,
+    "nfs_csi": {
+      "commit": "57ba72f46ca0864b16e9523ee71e88878c0a5c48",
+      "version": "v4.12.0"
+    },
+    "release_approved": false,
+    "runtime_security": {
+      "app_version": "5.5.3",
+      "chart_version": "v2.10.3",
+      "commit": "501b8f0e5213f2d1f4e1f904892fe86f7fb7e45b",
+      "online_cve_updater_enabled": false,
+      "prime_enabled": false,
+      "upstream": "NeuVector"
+    },
+    "source_commit": "e69734ad7d5c41b277714c66a46df25566b58eaa",
+    "status": "storage-security-reviewed-lock-still-incomplete"
+  },
   "reviewed_os_package_inputs": {
     "base_os_alias": "docker.io/rancher/harvester-os:v1.8-20260806",
     "base_os_ref": "docker.io/rancher/harvester-os@sha256:d437600ddc5e809cd22d9a6ddfc3c10328ac88440cef2930aa73aaf36b4178b4",
@@ -1325,6 +1470,18 @@
       "component": "layersentry-controller",
       "repository": "https://github.com/adaptgurus/harvester-installer.git",
       "version_label": "v1.0.0"
+    },
+    {
+      "commit": "57ba72f46ca0864b16e9523ee71e88878c0a5c48",
+      "component": "kubernetes-csi-driver-nfs",
+      "repository": "https://github.com/kubernetes-csi/csi-driver-nfs.git",
+      "version_label": "v4.12.0"
+    },
+    {
+      "commit": "501b8f0e5213f2d1f4e1f904892fe86f7fb7e45b",
+      "component": "neuvector-helm",
+      "repository": "https://github.com/neuvector/neuvector-helm.git",
+      "version_label": "v2.10.3"
     }
   ],
   "toolchain_artifacts": [

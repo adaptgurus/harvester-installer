@@ -1,0 +1,7 @@
+{
+  "captured_at": "2026-09-03T04:49:51Z",
+  "failure_count": 0,
+  "failures": [],
+  "schema": "layersentry.container-image-resolution-failures/v1",
+  "source_commit": "e69734ad7d5c41b277714c66a46df25566b58eaa"
+}

@@ -1,0 +1,83 @@
+{
+  "alias_count": 10,
+  "captured_at": "2026-09-03T04:49:51Z",
+  "complete": true,
+  "container_images": [
+    {
+      "aliases": [
+        "docker.io/neuvector/controller:5.5.3"
+      ],
+      "id": "docker-io-neuvector-controller",
+      "ref": "docker.io/neuvector/controller@sha256:6ad7c11a5678670b052fbae401c9816d9aeccd882ff0af730a1065c6d2e8d2e2"
+    },
+    {
+      "aliases": [
+        "docker.io/neuvector/enforcer:5.5.3"
+      ],
+      "id": "docker-io-neuvector-enforcer",
+      "ref": "docker.io/neuvector/enforcer@sha256:41c6ae02bdb5ebffd20c54facfef31ae900269d2613ee54113e82cb36eee562e"
+    },
+    {
+      "aliases": [
+        "docker.io/neuvector/manager:5.5.3"
+      ],
+      "id": "docker-io-neuvector-manager",
+      "ref": "docker.io/neuvector/manager@sha256:d207dbe604c3bc7b970901d483995804dccd42c2a377d0919cc2779e2fbfd456"
+    },
+    {
+      "aliases": [
+        "docker.io/neuvector/scanner:6"
+      ],
+      "id": "docker-io-neuvector-scanner",
+      "ref": "docker.io/neuvector/scanner@sha256:fd2d6b33eea15bfd1d9a7f9299ac0db31fb75962789e41d6967e5ee45f3c5519"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-node-driver-registrar",
+      "ref": "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:11f199f6bec47403b03cb49c79a41f445884b213b382582a60710b8c6fdc316a"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/csi-provisioner:v5.3.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-provisioner",
+      "ref": "registry.k8s.io/sig-storage/csi-provisioner@sha256:bb057f866177d5f4139a1527e594499cbe0feeb67b63aaca8679dfdf0a6016f9"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/csi-resizer:v1.14.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-resizer",
+      "ref": "registry.k8s.io/sig-storage/csi-resizer@sha256:5e7cbb63fd497fa913caa21fee1a69f727c220c6fa83c5f8bb0995e2ad73a474"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-csi-snapshotter",
+      "ref": "registry.k8s.io/sig-storage/csi-snapshotter@sha256:bc7be893ecc3ad524194aa6573b2f5c06cd469bdf21a500ab6c99c2ba1c4d64d"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/livenessprobe:v2.17.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-livenessprobe",
+      "ref": "registry.k8s.io/sig-storage/livenessprobe@sha256:9b75b9ade162136291d5e8f13a1dfc3dec71ee61419b1bfc112e0796ff8a6aa9"
+    },
+    {
+      "aliases": [
+        "registry.k8s.io/sig-storage/nfsplugin:v4.12.0"
+      ],
+      "id": "registry-k8s-io-sig-storage-nfsplugin",
+      "ref": "registry.k8s.io/sig-storage/nfsplugin@sha256:01cf7d10a9fbd7ce4188d5f15340f3619ef29b504418b306fff9f24792aac6d1"
+    }
+  ],
+  "resolved_alias_count": 10,
+  "resolver": "docker buildx imagetools inspect",
+  "review_required": true,
+  "schema": "layersentry.container-image-lock-candidate/v1",
+  "source_commit": "e69734ad7d5c41b277714c66a46df25566b58eaa",
+  "unresolved_alias_count": 0
+}

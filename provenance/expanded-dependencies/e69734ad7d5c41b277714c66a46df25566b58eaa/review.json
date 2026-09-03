@@ -1,0 +1,17 @@
+{
+  "alias_count": 10,
+  "appended_image_ref_count": 10,
+  "applied": true,
+  "existing_chart_count": 13,
+  "existing_image_ref_count": 118,
+  "expanded_chart_count": 3,
+  "final_chart_count": 16,
+  "final_image_ref_count": 128,
+  "lock_status": "incomplete",
+  "release_approved": false,
+  "remaining_unresolved_ids": [
+    "harvester-offline-image-set"
+  ],
+  "schema": "layersentry.expanded-dependency-review/v1",
+  "source_commit": "e69734ad7d5c41b277714c66a46df25566b58eaa"
+}

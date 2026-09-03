@@ -1,0 +1,28 @@
+{
+  "chart_count": 3,
+  "charts": [
+    {
+      "bytes": 34580,
+      "changed": true,
+      "path": "/home/runner/work/_temp/expanded-pass-1/charts/core-2.10.3.tgz",
+      "sha256": "32a9123d77e5c8a5a3e5ef88b9d0aeb27b713cb8aa2e5e00fa9ecce62edcd895",
+      "sha256_before": "f814825817f83c97047ec43b1c130814c8786e7552413208ea8967022950b7fd"
+    },
+    {
+      "bytes": 3879,
+      "changed": true,
+      "path": "/home/runner/work/_temp/expanded-pass-1/charts/crd-2.10.3.tgz",
+      "sha256": "76eec94aac107b73eaab37ceac003eb0282bdbe348301140a78680b7c8b7789a",
+      "sha256_before": "76721606367059203697dec7c7a52a040ea91706d4bb61c9fc4d63ff59b2dc7c"
+    },
+    {
+      "bytes": 11788,
+      "changed": true,
+      "path": "/home/runner/work/_temp/expanded-pass-1/charts/csi-driver-nfs-4.12.0.tgz",
+      "sha256": "139038e38654307e3ae792cf298da9af1e8602c81935230f003b6e526c7cf02a",
+      "sha256_before": "2d02ab3bc3bf6b49537f83e04180fe8e434bb126a4c402b0d54caa2610a475d1"
+    }
+  ],
+  "schema": "layersentry.deterministic-chart-normalization/v1",
+  "source_date_epoch": 1788410944
+}
