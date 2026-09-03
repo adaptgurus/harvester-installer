@@ -73,7 +73,7 @@ def patch_util() -> None:
     do_install_end = "func doUpgrade(g *gocui.Gui) error {\n"
 
     old_start = '''func doInstall(g *gocui.Gui, hvstConfig *config.HarvesterConfig, webhooks RendererWebhooks) error {\n\tctx := context.TODO()\n\twebhooks.Handle(EventInstallStarted)\n\n\terr := updateSystemSettings(hvstConfig)\n'''
-    new_start = '''func doInstall(g *gocui.Gui, hvstConfig *config.HarvesterConfig, webhooks RendererWebhooks) error {\n\tctx := context.TODO()\n\twebhooks.Handle(EventInstallStarted)\n\tresetLayerSentryInstallProgress()\n\tsetLayerSentryInstallProgress(g, "Validating installation media", 5)\n\tif err := validateLayerSentryInstallMedia(); err != nil {\n\t\twebhooks.Handle(EventInstallFailed)\n\t\treturn err\n\t}\n\n\terr := updateSystemSettings(hvstConfig)\n'''
+    new_start = '''func doInstall(g *gocui.Gui, hvstConfig *config.HarvesterConfig, webhooks RendererWebhooks) error {\n\tctx := context.TODO()\n\twebhooks.Handle(EventInstallStarted)\n\tresetLayerSentryInstallProgress()\n\tsetLayerSentryInstallProgress(g, "Validating installation media", 5)\n\tif err := validateLayerSentryInstallMedia(); err != nil {\n\t\twebhooks.Handle(EventInstallFailed)\n\t\treturn err\n\t}\n\tensureLayerSentryProductionAddons(hvstConfig)\n\n\terr := updateSystemSettings(hvstConfig)\n'''
     text = replace_once_in_region(
         text, do_install_start, do_install_end, old_start, new_start, "install-start lifecycle"
     )
@@ -160,6 +160,7 @@ def validate_result() -> None:
         'captureLayerSentryInstallOutput(g, cmdName, "[stderr]", stderr)',
         'captureLayerSentryInstallOutput(g, cmdName, "[stdout]", stdout)',
         'setLayerSentryInstallProgress(g, "Validating installation media", 5)',
+        'ensureLayerSentryProductionAddons(hvstConfig)',
         'setLayerSentryInstallProgress(g, "Preparing system disks", 18)',
         'setLayerSentryInstallProgress(g, "Installing base operating system", 32)',
         'setLayerSentryInstallProgress(g, "Applying LayerSentry branding and defaults", 88)',
